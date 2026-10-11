@@ -538,6 +538,7 @@ public abstract class SkinObject extends DisposableObject {
 		if(stretch != null) {
 			stretch.stretchRect(tmpRect, tmpImage, image);
 		}
+		transformDrawImage(tmpImage);
 		sprite.setColor(color);
 		sprite.setBlend(dstblend);
 		sprite.setType(dstfilter != 0 && imageType == SkinObjectRenderer.TYPE_NORMAL ? 
@@ -564,6 +565,7 @@ public abstract class SkinObject extends DisposableObject {
 		if(stretch != null) {
 			stretch.stretchRect(tmpRect, tmpImage, image);
 		}
+		transformDrawImage(tmpImage);
 		sprite.setColor(color);
 		sprite.setBlend(dstblend);
 		sprite.setType(dstfilter != 0 && imageType == SkinObjectRenderer.TYPE_NORMAL ? 
@@ -576,6 +578,9 @@ public abstract class SkinObject extends DisposableObject {
 			sprite.draw(tmpImage, tmpRect.x, tmpRect.y, tmpRect.width, tmpRect.height);
 		}
 	}
+
+    /** Optional source transform after aspect fitting/cropping, before sampling. */
+    protected void transformDrawImage(TextureRegion image) { }
 
 	protected boolean mousePressed(MainState state, int button, int x, int y) {
 		if (clickevent != null) {

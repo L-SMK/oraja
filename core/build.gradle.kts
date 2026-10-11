@@ -87,6 +87,7 @@ tasks {
             val ffmpegPrefix = "org/bytedeco/ffmpeg/$nativeClassifier/"
             val requiredEntries = when (targetPlatform) {
                 "windows" -> listOf(
+                    "${ffmpegPrefix}ffmpeg.exe",
                     "${javaCppPrefix}jnijavacpp.dll",
                     "${javaCppPrefix}msvcp140.dll",
                     "${javaCppPrefix}vcruntime140.dll",
@@ -108,6 +109,7 @@ tasks {
                     "${ffmpegPrefix}swscale-8.dll",
                 )
                 "macos" -> listOf(
+                    "${ffmpegPrefix}ffmpeg",
                     "${javaCppPrefix}libjnijavacpp.dylib",
                     "${ffmpegPrefix}libjniavutil.dylib",
                     "${ffmpegPrefix}libavutil.59.dylib",
@@ -125,6 +127,7 @@ tasks {
                     "${ffmpegPrefix}libswscale.8.dylib",
                 )
                 else -> listOf(
+                    "${ffmpegPrefix}ffmpeg",
                     "${javaCppPrefix}libjnijavacpp.so",
                     "${ffmpegPrefix}libjniavutil.so",
                     "${ffmpegPrefix}libavutil.so.59",

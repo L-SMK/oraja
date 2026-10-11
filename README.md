@@ -20,6 +20,15 @@ OpenALでは未対応と表示し、設定値を保持します。変更は本�
 
 ## Current Version
 
+手元カメラ入力をJSON/Luaスキンの `camera` 部品で表示できます（初期OFF）。
+位置・サイズ・切り抜き・表示条件をスキンで管理します。
+設定方法と例、実機確認項目は [手元カメラ](docs/HAND_CAMERA.md) を参照してください。
+
+Version 0.4.14.110 preserves every feature in the 0.4.14.109 optional test
+lineage and adds skin-controlled hand camera input. Launcher 0.2.30 includes
+the macOS camera usage description; plugin 0.0.79 is retained. Updates remain
+optional. See [the test scope](docs/TEST_RELEASE_0.4.14.110.md).
+
 Version 0.4.14.106 preserves the 0.4.14.105 internal test lineage and refines
 generated charts: repeated bars keep their own fills, choruses get chords like
 A-melodies, no notes on dying tails, and notes stay within the span where the

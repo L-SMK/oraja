@@ -1204,7 +1204,29 @@ public class PlayConfigurationView implements Initializable {
 						sidebarSettingRow(videoTab, "bgaExpand", "BGAの拡大方法", "BGA scaling",
 								"縦横比を保つ、領域いっぱいに広げる、拡大しない、から選びます。",
 								"Choose aspect-preserving, full-area, or no expansion.")
-				)
+				),
+                sidebarSettingCard(
+                        sidebarSettingRow(videoTab, "handCameraEnabled", "手元カメラ", "Hand camera",
+                                "スキンの指定場所に手元映像を表示します。初期OFFです。",
+                                "Show hand video where the skin requests it. OFF by default."),
+                        sidebarSettingRow(videoTab, "使用するカメラ", "Camera",
+                                "一覧を更新してカメラを選択します。位置と表示する画面はスキンが指定します。",
+                                "Refresh and select a camera. The skin controls placement and screens.",
+                                sidebarCompound(sidebarControl(videoTab, "handCameraDevice"),
+                                        sidebarControl(videoTab, "handCameraRefresh"))),
+                        sidebarWorkspaceRow(videoTab, "カメラの状態", "Camera status",
+                                "カメラが見つからない場合は接続とOSのカメラ許可を確認してください。",
+                                "If no camera is found, check the connection and OS camera permission.",
+                                sidebarMovable(videoTab, "handCameraStatus")),
+                        sidebarSettingRow(videoTab, "handCameraWidth", "カメラの幅（px）", "Camera width (px)",
+                                "カメラが対応する幅を指定します。初期640。", "Choose a supported width. Default 640."),
+                        sidebarSettingRow(videoTab, "handCameraHeight", "カメラの高さ（px）", "Camera height (px)",
+                                "カメラが対応する高さを指定します。初期480。", "Choose a supported height. Default 480."),
+                        sidebarSettingRow(videoTab, "handCameraFps", "カメラのFPS", "Camera FPS",
+                                "カメラが対応するFPSを指定します。初期30。", "Choose a supported FPS. Default 30."),
+                        sidebarSettingRow(videoTab, "handCameraMirror", "左右反転", "Mirror horizontally",
+                                "手元映像を左右反転します。", "Mirror the hand video horizontally.")
+                )
 		);
 	}
 

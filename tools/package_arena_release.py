@@ -111,6 +111,9 @@ def macos_launcher_executable(launcher_app: Path) -> Path:
     executable = launcher_app / "Contents" / "MacOS" / executable_name
     if not executable_name or not executable.is_file():
         raise ValueError("macOS launcher bundle executable is missing")
+    camera_description = info.get("NSCameraUsageDescription")
+    if not isinstance(camera_description, str) or not camera_description.strip():
+        raise ValueError("macOS launcher requires a camera usage description for the hand-camera body")
     return executable
 
 
