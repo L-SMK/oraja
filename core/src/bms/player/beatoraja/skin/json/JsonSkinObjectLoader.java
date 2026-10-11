@@ -40,6 +40,14 @@ public abstract class JsonSkinObjectLoader<S extends Skin> {
 		if (loader.claimsSceneId(dst.id)) {
 			return loader.loadSceneObject(dst.id, p);
 		}
+        if (sk.camera != null) {
+            for (JsonSkin.Camera camera : sk.camera) {
+                if (camera != null && dst.id.equals(camera.id)) {
+                    return new SkinCamera(new bms.player.beatoraja.camera.CameraCrop(camera.cropX, camera.cropY,
+                            camera.cropWidth, camera.cropHeight));
+                }
+            }
+        }
 		
 		for (JsonSkin.Image img : sk.image) {
 			if (dst.id.equals(img.id)) {

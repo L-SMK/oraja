@@ -438,6 +438,7 @@ public class JSONSkinLoader extends SkinLoader {
 		collectIds(ordinaryIds, skin.source, value -> value.id);
 		collectIds(ordinaryIds, skin.font, value -> value.id);
 		collectIds(ordinaryIds, skin.image, value -> value.id);
+        collectIds(ordinaryIds, skin.camera, value -> value.id);
 		collectIds(ordinaryIds, skin.imageset, value -> value.id);
 		collectIds(ordinaryIds, skin.value, value -> value.id);
 		collectIds(ordinaryIds, skin.floatvalue, value -> value.id);

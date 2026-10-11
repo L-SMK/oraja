@@ -27,6 +27,10 @@ still an operator check.
 
 ## Current Version
 
+手元カメラ入力をJSON/Luaスキンの `camera` 部品で表示できます（source実装、初期OFF）。
+位置・サイズ・切り抜き・表示条件をスキンで管理します。
+設定方法と例、実機確認項目は [手元カメラ](docs/HAND_CAMERA.md) を参照してください。
+
 The startup settings include a per-player **Mod Menu items** page, also
 reachable inside the Insert menu. Its default-on filter can hide and disable
 each of the 14 built-in entries. Turning the filter off restores the complete

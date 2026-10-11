@@ -124,6 +124,9 @@ public class MainController {
 	private final PersistentRankingDataStore persistentRankingDataStore = new PersistentRankingDataStore();
 
 	private SpriteBatch sprite;
+    private bms.player.beatoraja.camera.HandCameraManager handCameraManager;
+
+    public bms.player.beatoraja.camera.HandCameraManager getHandCameraManager() { return handCameraManager; }
 	/**
 	 * 1曲プレイで指定したBMSファイル
 	 */
@@ -1176,6 +1179,8 @@ public class MainController {
 	public void render() {
 //		input.poll();
 		timer.update();
+        if (handCameraManager == null) handCameraManager = new bms.player.beatoraja.camera.HandCameraManager(config);
+        handCameraManager.beginFrame();
 
 		Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
@@ -1186,6 +1191,8 @@ public class MainController {
 			current.getSkin().drawAllObjects(sprite, current);
 		}
 		sprite.end();
+
+        handCameraManager.endFrame();
 
 		final Stage stage = current.getStage();
 		if (stage != null) {
@@ -1383,6 +1390,7 @@ public class MainController {
 
 	public void dispose() {
 		BMSIRArenaClient.shutdown();
+        if (handCameraManager != null) handCameraManager.close();
 		judgeTimingRestore.restore(player);
 		saveConfig();
 
@@ -1430,6 +1438,7 @@ public class MainController {
 	}
 
 	public void pause() {
+        if (handCameraManager != null) handCameraManager.suspend();
 		current.pause();
 	}
 

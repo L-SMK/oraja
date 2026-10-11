@@ -187,6 +187,11 @@ public class Config implements Validatable {
 
 	private int frameskip = 1;
 
+    private boolean handCameraEnabled;
+    private String handCameraDevice = "";
+    private int handCameraWidth = 640, handCameraHeight = 480, handCameraFps = 30;
+    private boolean handCameraMirror;
+
 	/**
 	 * Write opt-in BGA/input/render/audio timing summaries to
 	 * logs/bmsir-timing.log. Disabled by default because even lightweight
@@ -428,6 +433,19 @@ public class Config implements Validatable {
 	public int getBga() {
 		return bga;
 	}
+
+    public boolean isHandCameraEnabled() { return handCameraEnabled; }
+    public void setHandCameraEnabled(boolean value) { handCameraEnabled = value; }
+    public String getHandCameraDevice() { return handCameraDevice; }
+    public void setHandCameraDevice(String value) { handCameraDevice = value; }
+    public int getHandCameraWidth() { return handCameraWidth; }
+    public void setHandCameraWidth(int value) { handCameraWidth = value; }
+    public int getHandCameraHeight() { return handCameraHeight; }
+    public void setHandCameraHeight(int value) { handCameraHeight = value; }
+    public int getHandCameraFps() { return handCameraFps; }
+    public void setHandCameraFps(int value) { handCameraFps = value; }
+    public boolean isHandCameraMirror() { return handCameraMirror; }
+    public void setHandCameraMirror(boolean value) { handCameraMirror = value; }
 
 	public void setBga(int bga) {
 		this.bga = bga;
@@ -1050,6 +1068,11 @@ public class Config implements Validatable {
 		tableURL = Validatable.removeInvalidElements(tableURL);
 
 		bga = MathUtils.clamp(bga, 0, 2);
+        var camera = bms.player.beatoraja.camera.HandCameraSettings.from(this);
+        handCameraDevice = camera.device();
+        handCameraWidth = camera.width();
+        handCameraHeight = camera.height();
+        handCameraFps = camera.fps();
 		bgaExpand = MathUtils.clamp(bgaExpand, 0, 2);
         bgaQualityMode = getBgaQualityMode().name();
         if (bgaMaxFps != 0 && bgaMaxFps != 15 && bgaMaxFps != 24 && bgaMaxFps != 30 && bgaMaxFps != 60) bgaMaxFps = 0;
