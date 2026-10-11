@@ -14,6 +14,7 @@ from package_arena_release import (
     PLUGIN_FILENAME,
     VERSION,
     build_release,
+    macos_launcher_executable,
 )
 from verify_native_audio_bundle import (
     ASIO_ARCHIVE_SHA256,
@@ -127,6 +128,7 @@ class ArenaReleasePackageTest(unittest.TestCase):
                     "CFBundleExecutable": "bmsir-arena-launcher",
                     "CFBundleIdentifier": "org.bms-ir.arena.launcher.test",
                     "CFBundleName": "BMS-IR Arena Test",
+                    "NSCameraUsageDescription": "Display the optional hand camera in Arena oraja skins.",
                 }
             )
         )
@@ -171,6 +173,9 @@ class ArenaReleasePackageTest(unittest.TestCase):
                         "BMS-IR-Arena-config.command",
                     )
                 ]
+                camera_description = plistlib.loads(archive.read(
+                    "BMS-IR Arena Test.app/Contents/Info.plist"))["NSCameraUsageDescription"]
+            self.assertEqual("Display the optional hand camera in Arena oraja skins.", camera_description)
             self.assertIn(BODY_FILENAME, names)
             self.assertNotIn("beatoraja.jar", names)
             self.assertIn(f"ir/{PLUGIN_FILENAME}", names)
@@ -188,6 +193,22 @@ class ArenaReleasePackageTest(unittest.TestCase):
             self.assertFalse(any(name.startswith("player/") for name in names))
             self.assertTrue(all(stat.S_ISREG(mode) for mode in executable_modes))
             self.assertTrue(all(mode & stat.S_IXUSR for mode in executable_modes))
+
+    def test_rejects_launcher_missing_or_invalid_camera_description(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = self.fixture(Path(temporary))
+            info_path = fixture["launcher_app"] / "Contents" / "Info.plist"
+            original = plistlib.loads(info_path.read_bytes())
+            for value in (None, "", "  ", 123):
+                with self.subTest(value=value):
+                    info = dict(original)
+                    if value is None:
+                        info.pop("NSCameraUsageDescription")
+                    else:
+                        info["NSCameraUsageDescription"] = value
+                    info_path.write_bytes(plistlib.dumps(info))
+                    with self.assertRaisesRegex(ValueError, "camera usage description"):
+                        macos_launcher_executable(fixture["launcher_app"])
 
     def test_requires_explicit_asset_redistribution_confirmation(self):
         with tempfile.TemporaryDirectory() as temporary:

@@ -1,4 +1,5 @@
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Button?>
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.control.SpinnerValueFactory.IntegerSpinnerValueFactory?>
@@ -76,6 +77,28 @@
         <CheckBox fx:id="bgaAsyncPipeline" GridPane.rowIndex="11" GridPane.columnIndex="1"/>
         <Label text="%BGA_PERFORMANCE_STATS" GridPane.rowIndex="12" GridPane.columnIndex="0" styleClass="optionLabel"/>
         <CheckBox fx:id="bgaPerformanceStats" GridPane.rowIndex="12" GridPane.columnIndex="1"/>
+
+        <Label text="%HAND_CAMERA" GridPane.rowIndex="13" GridPane.columnSpan="2" styleClass="optionHeader"/>
+        <CheckBox fx:id="handCameraEnabled" GridPane.rowIndex="14" GridPane.columnIndex="1"/>
+        <Label text="%HAND_CAMERA_ENABLED" labelFor="$handCameraEnabled" GridPane.rowIndex="14" styleClass="optionLabel"/>
+        <ComboBox fx:id="handCameraDevice" editable="true" GridPane.rowIndex="15" GridPane.columnIndex="1" prefWidth="250"/>
+        <Label text="%HAND_CAMERA_DEVICE" labelFor="$handCameraDevice" GridPane.rowIndex="15" styleClass="optionLabel"/>
+        <Button fx:id="handCameraRefresh" text="%HAND_CAMERA_REFRESH" onAction="#refreshHandCameras" GridPane.rowIndex="16" GridPane.columnIndex="1"/>
+        <Label fx:id="handCameraStatus" text="%HAND_CAMERA_HELP" wrapText="true" maxWidth="400" GridPane.rowIndex="17" GridPane.columnSpan="2"/>
+        <NumericSpinner fx:id="handCameraWidth" editable="true" GridPane.rowIndex="18" GridPane.columnIndex="1">
+            <valueFactory><SpinnerValueFactory.IntegerSpinnerValueFactory initialValue="640" min="160" max="1920"/></valueFactory>
+        </NumericSpinner>
+        <Label text="%HAND_CAMERA_WIDTH" labelFor="$handCameraWidth" GridPane.rowIndex="18" styleClass="optionLabel"/>
+        <NumericSpinner fx:id="handCameraHeight" editable="true" GridPane.rowIndex="19" GridPane.columnIndex="1">
+            <valueFactory><SpinnerValueFactory.IntegerSpinnerValueFactory initialValue="480" min="120" max="1080"/></valueFactory>
+        </NumericSpinner>
+        <Label text="%HAND_CAMERA_HEIGHT" labelFor="$handCameraHeight" GridPane.rowIndex="19" styleClass="optionLabel"/>
+        <NumericSpinner fx:id="handCameraFps" editable="true" GridPane.rowIndex="20" GridPane.columnIndex="1">
+            <valueFactory><SpinnerValueFactory.IntegerSpinnerValueFactory initialValue="30" min="1" max="60"/></valueFactory>
+        </NumericSpinner>
+        <Label text="%HAND_CAMERA_FPS" labelFor="$handCameraFps" GridPane.rowIndex="20" styleClass="optionLabel"/>
+        <CheckBox fx:id="handCameraMirror" GridPane.rowIndex="21" GridPane.columnIndex="1"/>
+        <Label text="%HAND_CAMERA_MIRROR" labelFor="$handCameraMirror" GridPane.rowIndex="21" styleClass="optionLabel"/>
 
         <stylesheets>
             <URL value="@LauncherStyle.css"/>

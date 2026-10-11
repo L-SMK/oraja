@@ -32,6 +32,7 @@ public class JsonSkin {
 		 */
 		public SceneResource[] scenes = new SceneResource[0];
 		public Image[] image = new Image[0];
+        public Camera[] camera = new Camera[0];
 		public ImageSet[] imageset = new ImageSet[0];
 		public Value[] value = new Value[0];
 		public FloatValue[] floatvalue = new FloatValue[0];
@@ -117,6 +118,12 @@ public class JsonSkin {
 		public float playbackRate = 1.0f;
 		public boolean loop = true;
 	}
+
+    public static class Camera {
+        public String id;
+        public float cropX, cropY;
+        public float cropWidth = 1, cropHeight = 1;
+    }
 
 	public static class Image {
 		public String id;
