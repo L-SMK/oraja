@@ -341,6 +341,7 @@ public final class PlayDataAccessor {
 		if (score == null) {
 			score = new ScoreData();
 			score.setMode(model.containsUndefinedLongNote() ? lnmode : 0);
+			score.setBmsirEffectiveLnType(newscore.getBmsirEffectiveLnType());
 		}
 		score.setSha256(hash);
 		if (changedLnMode) score.setBmsirLongNotePolicy(BMSIRLongNoteMode.SCORE_POLICY);
@@ -622,6 +623,7 @@ public final class PlayDataAccessor {
 		if (score == null) {
 			score = new ScoreData();
 			score.setMode((ln ? lnmode : 0) + option * 10 + hispeed * 100 + judge * 1000 + gauge * 10000);
+			score.setBmsirEffectiveLnType(newscore.getBmsirEffectiveLnType());
 		}
 		score.setSha256(hash);
 		score.setNotes(totalnotes);
@@ -641,6 +643,7 @@ public final class PlayDataAccessor {
 		score.setScorehash(getScoreHash(score));
 		targetDatabase.setScoreData(score);
 		ScoreLogDatabaseAccessor courseLog = changedLnMode ? forcedScorelogdb : scorelogdb;
+		newscore.setMode(score.getMode());
 		if (log.getSha256() != null && courseLog != null) {
 			log.setMode(score.getMode());
 			log.setDate(score.getDate());
@@ -686,6 +689,7 @@ public final class PlayDataAccessor {
 		log.setOldscore(score.getExscore());
 		log.setScore(score.getExscore());
 		if (score.getExscore() < newscore.getExscore() && updateScore) {
+			score.setBmsirEffectiveLnType(newscore.getBmsirEffectiveLnType());
 			log.setSha256(hash);
 			log.setScore(newscore.getExscore());
 		}
