@@ -234,6 +234,7 @@ public final class BMSIRArenaOverlay {
         renderPinnedRoomReady(config);
 		bms.player.beatoraja.modmenu.FunctionKeyMenu.renderOpenButton();
 		renderSpeedBlock(false);
+		renderAlsoIn("プレイ設定", "Play Settings");
         ImGui.separator();
         if (ImGui.beginChild("##bmsir-arena-scroll-content", 0, 0, false)
                 && ImGui.beginTabBar("##bmsir-arena-tabs")) {
@@ -261,6 +262,7 @@ public final class BMSIRArenaOverlay {
             }
             if (ImGui.beginTabItem(t("プロファイル", "Profiles"))) {
                 BMSIRKeyProfilePanel.render(config);
+                renderAlsoIn("プレイ設定", "Play Settings");
                 ImGui.endTabItem();
             }
             if (ImGui.beginTabItem(t("設定", "Settings"))) {
@@ -3540,7 +3542,8 @@ public final class BMSIRArenaOverlay {
         ImGui.separator();
     }
 
-    private static void renderSettings(PlayerConfig config) {
+    /** Shared with the F5 menu's Display window; both edit the same player setting. */
+    public static void renderLanguageSetting(PlayerConfig config) {
         LANGUAGE.set("en".equals(config.getBmsirArenaLanguage()) ? 1 : 0);
         if (ImGui.combo(
                 t("本体UI言語", "Client UI language"),
@@ -3551,6 +3554,81 @@ public final class BMSIRArenaOverlay {
             BMSIRArenaI18n.setLanguage(config.getBmsirArenaLanguage());
             saveSettingsOrWarn();
         }
+    }
+
+    /** Shared with the F5 menu's Display window. */
+    public static void renderDisplayToggles(PlayerConfig config) {
+        ImBoolean cursor = new ImBoolean(config.isBmsirArenaShowCursor());
+        if (ImGui.checkbox(t("プレイ中もマウスカーソルを表示", "Show cursor during play"), cursor)) {
+            config.setBmsirArenaShowCursor(cursor.get());
+        }
+        ImBoolean presentation = new ImBoolean(
+                config.isBmsirArenaPresentationOverlayEnabled()
+        );
+        if (ImGui.checkbox(t("重要フェーズを画面中央に大きく表示", "Show large phase announcements"), presentation)) {
+            config.setBmsirArenaPresentationOverlayEnabled(
+                    presentation.get()
+            );
+        }
+    }
+
+    /** Shared with the F5 menu's Sound window. */
+    public static void renderNotificationSoundSettings(PlayerConfig config) {
+        ImBoolean countdownSe = new ImBoolean(
+                config.isBmsirArenaCountdownSeEnabled()
+        );
+        if (ImGui.checkbox(t("Arena 3・2・1カウントSE", "Arena 3-2-1 sound"), countdownSe)) {
+            config.setBmsirArenaCountdownSeEnabled(countdownSe.get());
+        }
+        ImBoolean startSe = new ImBoolean(config.isBmsirArenaStartSeEnabled());
+        if (ImGui.checkbox(t("Arena開始SE", "Arena start sound"), startSe)) {
+            config.setBmsirArenaStartSeEnabled(startSe.get());
+        }
+        ImBoolean phaseWarning = new ImBoolean(
+                config.isBmsirArenaPhaseWarningEnabled()
+        );
+        if (ImGui.checkbox(t("選曲・OP残り10秒／5秒の警告SE", "10/5 second selection warning sound"), phaseWarning)) {
+            config.setBmsirArenaPhaseWarningEnabled(phaseWarning.get());
+        }
+        int[] notificationVolume = {
+                config.getBmsirArenaNotificationSeVolume()
+        };
+        if (ImGui.sliderInt(
+                t("Arena通知SE音量", "Arena sound volume"),
+                notificationVolume,
+                0,
+                100
+        )) {
+            config.setBmsirArenaNotificationSeVolume(notificationVolume[0]);
+        }
+        if (ImGui.button(t("Arena通知音をテスト", "Test Arena sound"))) {
+            BMSIRArenaClient.playPresentationSound(
+                    bms.player.beatoraja.SystemSoundManager.SoundType.ARENA_MATCH_FOUND,
+                    config.getBmsirArenaNotificationSeVolume() / 100.0f
+            );
+        }
+    }
+
+    /** Shared with the F5 menu's Play Settings window. */
+    public static void renderHispeedSettings() {
+        renderSpeedBlock(false);
+    }
+
+    /** Shared with the F5 menu's Play Settings window. */
+    public static void renderKeyProfiles(PlayerConfig config) {
+        BMSIRKeyProfilePanel.render(config);
+    }
+
+    private static void renderAlsoIn(String japaneseWindow, String englishWindow) {
+        ImGui.textDisabled(t(
+                "F5メニューの「" + japaneseWindow + "」でも変更できます",
+                "Also available in the F5 menu's " + englishWindow + " window"
+        ));
+    }
+
+    private static void renderSettings(PlayerConfig config) {
+        renderLanguageSetting(config);
+        renderAlsoIn("表示", "Display");
         ImGui.text(t("表示モード", "Display mode"));
         if (ImGui.radioButton(t("通常", "Full"), config.getBmsirArenaOverlayMode() == 0)) {
             config.setBmsirArenaOverlayMode(0);
@@ -3633,51 +3711,10 @@ public final class BMSIRArenaOverlay {
                 "Rank order marks self in red; entry order also fixes player colors"
         ));
 
-        ImBoolean cursor = new ImBoolean(config.isBmsirArenaShowCursor());
-        if (ImGui.checkbox(t("プレイ中もマウスカーソルを表示", "Show cursor during play"), cursor)) {
-            config.setBmsirArenaShowCursor(cursor.get());
-        }
-        ImBoolean presentation = new ImBoolean(
-                config.isBmsirArenaPresentationOverlayEnabled()
-        );
-        if (ImGui.checkbox(t("重要フェーズを画面中央に大きく表示", "Show large phase announcements"), presentation)) {
-            config.setBmsirArenaPresentationOverlayEnabled(
-                    presentation.get()
-            );
-        }
-        ImBoolean countdownSe = new ImBoolean(
-                config.isBmsirArenaCountdownSeEnabled()
-        );
-        if (ImGui.checkbox(t("Arena 3・2・1カウントSE", "Arena 3-2-1 sound"), countdownSe)) {
-            config.setBmsirArenaCountdownSeEnabled(countdownSe.get());
-        }
-        ImBoolean startSe = new ImBoolean(config.isBmsirArenaStartSeEnabled());
-        if (ImGui.checkbox(t("Arena開始SE", "Arena start sound"), startSe)) {
-            config.setBmsirArenaStartSeEnabled(startSe.get());
-        }
-        ImBoolean phaseWarning = new ImBoolean(
-                config.isBmsirArenaPhaseWarningEnabled()
-        );
-        if (ImGui.checkbox(t("選曲・OP残り10秒／5秒の警告SE", "10/5 second selection warning sound"), phaseWarning)) {
-            config.setBmsirArenaPhaseWarningEnabled(phaseWarning.get());
-        }
-        int[] notificationVolume = {
-                config.getBmsirArenaNotificationSeVolume()
-        };
-        if (ImGui.sliderInt(
-                t("Arena通知SE音量", "Arena sound volume"),
-                notificationVolume,
-                0,
-                100
-        )) {
-            config.setBmsirArenaNotificationSeVolume(notificationVolume[0]);
-        }
-        if (ImGui.button(t("Arena通知音をテスト", "Test Arena sound"))) {
-            BMSIRArenaClient.playPresentationSound(
-                    bms.player.beatoraja.SystemSoundManager.SoundType.ARENA_MATCH_FOUND,
-                    config.getBmsirArenaNotificationSeVolume() / 100.0f
-            );
-        }
+        renderDisplayToggles(config);
+        renderAlsoIn("表示", "Display");
+        renderNotificationSoundSettings(config);
+        renderAlsoIn("音", "Sound");
         ImBoolean unrestricted = new ImBoolean(
                 config.isBmsirArenaUnrestrictedRating()
         );

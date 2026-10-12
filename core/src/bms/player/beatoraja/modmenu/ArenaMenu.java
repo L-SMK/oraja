@@ -4,19 +4,14 @@ import bms.player.beatoraja.MainController;
 import bms.player.beatoraja.arena.client.ArenaBar;
 import bms.player.beatoraja.arena.bmsir.BMSIRArenaI18n;
 import bms.player.beatoraja.arena.client.Client;
-import bms.player.beatoraja.arena.lobby.Lobby;
-import bms.player.beatoraja.arena.server.ArenaServer;
 import bms.player.beatoraja.select.MusicSelector;
 import bms.player.beatoraja.song.SongData;
-import imgui.ImGui;
-import imgui.flag.ImGuiFocusedFlags;
-import imgui.flag.ImGuiTreeNodeFlags;
-import imgui.flag.ImGuiWindowFlags;
-import imgui.type.ImBoolean;
 
+/**
+ * Chart-selection helpers shared with the BMS-IR Arena client. The legacy
+ * EndlessDream ArenaEX window that used to live here has been removed.
+ */
 public class ArenaMenu {
-    public static boolean isFocused = false;
-    public static boolean isShow = false;
     private static MusicSelector selector;
 
     private static String t(String japanese, String english) {
@@ -35,80 +30,6 @@ public class ArenaMenu {
     public static void init(String username, MusicSelector selector) {
         Client.userName.set(username);
         ArenaMenu.selector = selector;
-    }
-
-    public static void show(ImBoolean showArenaMenu) {
-        ImGui.begin("EndlessDream ArenaEX", showArenaMenu, ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoBringToFrontOnFocus);
-        {
-            isFocused = ImGui.isWindowFocused(ImGuiFocusedFlags.RootAndChildWindows);
-            if (ImGui.beginTabBar("TabBar")) {
-                if (ImGui.beginTabItem(t("クライアント", "Client") + "###client")) {
-                    if (ImGui.collapsingHeader(t("接続", "Connect"), ImGuiTreeNodeFlags.DefaultOpen)) {
-                        ImGui.inputText(t("ユーザー名", "Username"), Client.userName);
-                        ImGui.inputText(t("サーバー", "Server"), Client.host);
-
-                        ImGui.beginDisabled(Client.host.isEmpty() || Client.userName.isEmpty());
-                        if (ImGui.button(t("接続", "Connect") + "##Button")) {
-                            Client.connect(Client.host.get(), Client.userName.get());
-                        }
-                        ImGui.endDisabled();
-
-                        ImGui.sameLine();
-
-                        ImGui.beginDisabled(!Client.connected.get());
-                        if (ImGui.button(t("切断", "Disconnect"))) {
-                            Client.disconnect();
-                        }
-                        ImGui.endDisabled();
-                    }
-                    ImGui.endTabItem();
-                    if (Client.connected.get()) {
-                        ImGui.separator();
-                        Lobby.render();
-                    }
-                }
-
-                if (ImGui.beginTabItem(t("サーバー", "Server") + "###server")) {
-                    ImGui.text(t("サーバー", "Server"));
-                    ImGui.separator();
-
-                    ImGui.beginDisabled(ArenaServer.serverStarted.get());
-                    if (ImGui.button(t("開始", "Start"))) {
-                        try {
-                            ArenaServer.start();
-                        } catch (Exception e) {
-                            ImGuiNotify.error(String.format(t(
-                                    "サーバーを開始できませんでした: %s",
-                                    "Failed to start server: %s"
-                            ), e.getMessage()));
-                        }
-                    }
-                    ImGui.endDisabled();
-
-                    ImGui.beginDisabled(!ArenaServer.serverStarted.get());
-                    if (ImGui.button(t("停止", "Stop"))) {
-                        try {
-                            ArenaServer.stop();
-                        } catch (Exception e) {
-                            ImGuiNotify.error(String.format(t(
-                                    "サーバーを停止できませんでした: %s",
-                                    "Failed to stop server: %s"
-                            ), e.getMessage()));
-                        }
-                    }
-                    ImGui.endDisabled();
-                    if (ImGui.checkbox(t(
-                            "曲ごとにホストを交代する",
-                            "Auto-rotate host after each song"
-                    ), ArenaServer.getServerAutoRotate())) {
-                        ArenaServer.setServerAutoRotate(!ArenaServer.getServerAutoRotate());
-                    }
-                    ImGui.endTabItem();
-                }
-                ImGui.endTabBar();
-            }
-            ImGui.end();
-        }
     }
 
     /**
