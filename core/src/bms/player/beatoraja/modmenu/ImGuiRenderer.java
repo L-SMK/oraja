@@ -1,6 +1,5 @@
 package bms.player.beatoraja.modmenu;
 
-import bms.player.beatoraja.arena.lobby.GraphMenu;
 import bms.player.beatoraja.PlayerConfig;
 import bms.player.beatoraja.arena.bmsir.BMSIRArenaClient;
 import bms.player.beatoraja.arena.bmsir.BMSIRArenaI18n;
@@ -56,12 +55,12 @@ public class ImGuiRenderer {
     private static ImBoolean SHOW_JUDGE_TRAINER = new ImBoolean(false);
     private static ImBoolean SHOW_SONG_MANAGER = new ImBoolean(false);
     private static ImBoolean SHOW_DOWNLOAD_MENU = new ImBoolean(false);
-    private static ImBoolean SHOW_ARENA_MENU = new ImBoolean(false);
-    private static ImBoolean SHOW_GRAPH_MENU = new ImBoolean(false);
     private static ImBoolean SHOW_SKIN_WIDGET_MANAGER = new ImBoolean(false);
     private static ImBoolean SHOW_PERFORMANCE_MONITOR = new ImBoolean(false);
     private static ImBoolean SHOW_SKIN_MENU = new ImBoolean(false);
-    private static ImBoolean SHOW_MISC_SETTING = new ImBoolean(false);
+    private static ImBoolean SHOW_PLAY_SETTINGS = new ImBoolean(false);
+    private static ImBoolean SHOW_SOUND_SETTINGS = new ImBoolean(false);
+    private static ImBoolean SHOW_DISPLAY_SETTINGS = new ImBoolean(false);
     private static ImBoolean SHOW_MANIAC_OPTIONS = new ImBoolean(false);
     private static final float MY_TABLE_BATCH_INDICATOR_DEFAULT_FONT_SCALE = 1.300f;
     private static final float MY_TABLE_BATCH_INDICATOR_DEFAULT_X_RATIO = 0.346f;
@@ -172,9 +171,9 @@ public class ImGuiRenderer {
                 SHOW_PERFORMANCE_MONITOR.get()) {
                 PerformanceMonitor.reloadEventTree();
             }
-            if (show(ModMenuItem.MISC_SETTINGS)) ImGui.checkbox(t("その他設定", "Show Misc Setting Window"), SHOW_MISC_SETTING);
-            if (show(ModMenuItem.LEGACY_ARENA_MENU)) ImGui.checkbox(t("従来Arenaメニュー", "Show Legacy Arena Menu"), SHOW_ARENA_MENU);
-            if (show(ModMenuItem.LEGACY_ARENA_GRAPH)) ImGui.checkbox(t("従来Arenaグラフ", "Show Legacy Arena Graph"), SHOW_GRAPH_MENU);
+            if (show(ModMenuItem.PLAY_SETTINGS)) ImGui.checkbox(t("プレイ設定", "Show Play Settings Window"), SHOW_PLAY_SETTINGS);
+            if (show(ModMenuItem.SOUND_SETTINGS)) ImGui.checkbox(t("音", "Show Sound Window"), SHOW_SOUND_SETTINGS);
+            if (show(ModMenuItem.DISPLAY_SETTINGS)) ImGui.checkbox(t("表示", "Show Display Window"), SHOW_DISPLAY_SETTINGS);
             if (show(ModMenuItem.MANIAC_OPTIONS) && ImGui.button("MANIAC OPTIONS")) showManiacOptions();
             ImGui.separator();
             ImBoolean showBmsirArenaOverlay = new ImBoolean(
@@ -215,16 +214,14 @@ public class ImGuiRenderer {
             if (SHOW_SKIN_MENU.get()) {
                 SkinMenu.show(SHOW_SKIN_MENU);
             }
-            if (SHOW_MISC_SETTING.get()) {
-                MiscSettingMenu.show(SHOW_MISC_SETTING);
+            if (SHOW_PLAY_SETTINGS.get()) {
+                MiscSettingMenu.showPlaySettings(SHOW_PLAY_SETTINGS);
             }
-            if (SHOW_ARENA_MENU.get()) {
-                ArenaMenu.show(SHOW_ARENA_MENU);
-            } else {
-                ArenaMenu.isFocused = false;
+            if (SHOW_SOUND_SETTINGS.get()) {
+                MiscSettingMenu.showSoundSettings(SHOW_SOUND_SETTINGS);
             }
-            if (SHOW_GRAPH_MENU.get()) {
-                GraphMenu.show(SHOW_GRAPH_MENU);
+            if (SHOW_DISPLAY_SETTINGS.get()) {
+                MiscSettingMenu.showDisplaySettings(SHOW_DISPLAY_SETTINGS);
             }
 
 
@@ -534,12 +531,9 @@ public class ImGuiRenderer {
             case SONG_MANAGER -> SHOW_SONG_MANAGER.set(false);
             case DOWNLOAD_TASKS -> SHOW_DOWNLOAD_MENU.set(false);
             case PERFORMANCE_MONITOR -> SHOW_PERFORMANCE_MONITOR.set(false);
-            case MISC_SETTINGS -> SHOW_MISC_SETTING.set(false);
-            case LEGACY_ARENA_MENU -> {
-                SHOW_ARENA_MENU.set(false);
-                ArenaMenu.isFocused = false;
-            }
-            case LEGACY_ARENA_GRAPH -> SHOW_GRAPH_MENU.set(false);
+            case PLAY_SETTINGS -> SHOW_PLAY_SETTINGS.set(false);
+            case SOUND_SETTINGS -> SHOW_SOUND_SETTINGS.set(false);
+            case DISPLAY_SETTINGS -> SHOW_DISPLAY_SETTINGS.set(false);
             case BMSIR_ARENA_OVERLAY -> BMSIRArenaOverlay.setVisible(false);
             case MANIAC_OPTIONS -> {
                 SHOW_MANIAC_OPTIONS.set(false);

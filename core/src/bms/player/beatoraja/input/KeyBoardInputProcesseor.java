@@ -4,7 +4,6 @@ import java.util.Arrays;
 
 import bms.player.beatoraja.PlayModeConfig.KeyboardConfig;
 import bms.player.beatoraja.Resolution;
-import bms.player.beatoraja.modmenu.ArenaMenu;
 import bms.player.beatoraja.modmenu.ImGuiInputCapture;
 import bms.player.beatoraja.arena.bmsir.BMSIRArenaOverlay;
 import com.badlogic.gdx.Gdx;
@@ -108,8 +107,7 @@ public class KeyBoardInputProcesseor extends BMSPlayerInputDevice implements Inp
 	}
 
 	public synchronized void poll(final long microtime) {
-		boolean captureRequested = ArenaMenu.isFocused
-				|| BMSIRArenaOverlay.isHotkeyCaptureActive()
+		boolean captureRequested = BMSIRArenaOverlay.isHotkeyCaptureActive()
 				|| ImGuiInputCapture.isKeyboardCaptured();
 		if (captureRequested) {
 			keyboardCaptureActive = true;

@@ -13,9 +13,19 @@ public final class ModMenuSettings {
         normalize();
     }
 
+    /** The former single "Misc Settings" window, split into play, sound, and display. */
+    static final String LEGACY_MISC_SETTINGS_ID = "misc_settings";
+
     public ModMenuSettings normalize() {
         if (itemEnabled == null) {
             itemEnabled = new LinkedHashMap<>();
+        }
+        Boolean legacyMisc = itemEnabled.get(LEGACY_MISC_SETTINGS_ID);
+        if (legacyMisc != null) {
+            for (ModMenuItem item : new ModMenuItem[] {
+                    ModMenuItem.PLAY_SETTINGS, ModMenuItem.SOUND_SETTINGS, ModMenuItem.DISPLAY_SETTINGS}) {
+                itemEnabled.putIfAbsent(item.id, legacyMisc);
+            }
         }
         for (ModMenuItem item : ModMenuItem.values()) {
             itemEnabled.putIfAbsent(item.id, true);
