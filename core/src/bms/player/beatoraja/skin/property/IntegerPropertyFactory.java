@@ -335,16 +335,16 @@ public class IntegerPropertyFactory {
 			};
 		case NUMBER_GROOVEGAUGE:
 			return (state) -> {
+				final boolean fractional = state != null && state.getSkin() != null && state.getSkin().hasGaugeFraction();
 				if (state instanceof BMSPlayer) {
-					return ((BMSPlayer) state).getGauge().getGauge().getDisplayValue();
+					return ((BMSPlayer) state).getGauge().getGauge().getDisplayValue(fractional);
 				}
 				if (state instanceof AbstractResult) {
 					final int gaugeType = ((AbstractResult) state).getGaugeType();
-					if (bms.player.beatoraja.play.NantokaManiaRules.isActive(state.resource.getBMSModel())) {
-						return (int) (state.resource.getGauge()[gaugeType].peek() / 2) * 2;
-					}
-					return (int) state.resource.getGauge()[gaugeType]
-							.get(state.resource.getGauge()[gaugeType].size - 1);
+					final float value = state.resource.getGauge()[gaugeType].peek();
+					final int display = NantokaManiaRules.isActive(state.resource.getBMSModel())
+							? (int) (value / 2) * 2 : (int) value;
+					return fractional ? display : GaugeDisplay.minimumPositivePercent(value, display);
 				}
 				return Integer.MIN_VALUE;
 			};

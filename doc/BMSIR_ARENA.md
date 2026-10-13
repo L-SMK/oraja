@@ -1321,6 +1321,12 @@ ordinary system-sound volume multiplied by the Arena notification volume.
 
 ## Ordinary-play and skin additions
 
+- Integer-only gauge skins during play and on song/course results display at least
+  `1%` whenever the actual remainder is positive. This also covers NANTOKA
+  MANIA's positive remainder below its first 2% display step. Actual zero stays
+  `0%`. Skins declaring the separate gauge decimal digit keep their existing
+  integer and decimal values, as do nonzero display steps. Gauge arithmetic,
+  death/qualification, history, replays, and IR values retain the actual remainder.
 - The native game window title stays exactly `Arena oraja` across client
   versions so OBS window-capture rules remain stable. Configuration, What's
   New, startup, and other version-identification surfaces keep the versioned
