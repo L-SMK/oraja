@@ -479,6 +479,12 @@
                             <ComboBox fx:id="screenshotFormat" prefWidth="100.0" />
                         </children>
                     </HBox>
+                    <CheckBox fx:id="screenshotSound" text="スクショ保存音 / Screenshot sound" />
+                    <HBox spacing="10">
+                        <Label text="スクショ保存音量 / Screenshot volume" />
+                        <Slider fx:id="screenshotSoundVolume" min="0" max="1" value="0.5" prefWidth="180" />
+                    </HBox>
+                    <CheckBox fx:id="replayLaneSettings" text="リプレイの表示設定を再現 / Restore replay lane settings" />
                     <Button fx:id="importScoreButton" mnemonicParsing="false" onAction="#importScoreDataFromLR2" text="%IMPORT_LR2_SCORE">
                         <VBox.margin>
                             <Insets top="10.0" />

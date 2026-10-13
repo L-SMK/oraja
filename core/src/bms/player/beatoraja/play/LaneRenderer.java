@@ -60,7 +60,7 @@ public class LaneRenderer {
 
 	private int currentduration;
 	private double currentscroll = 1.0;
-	private final boolean bmsirLr2HispeedFixEnabled;
+	private boolean bmsirLr2HispeedFixEnabled;
 
 	private double basebpm;
 	private double nowbpm;
@@ -403,6 +403,36 @@ public class LaneRenderer {
 		}
 		return playconfig;
 	}
+
+    public bms.player.beatoraja.ReplayLaneState captureReplayLaneState(long time) {
+        return bms.player.beatoraja.ReplayLaneState.capture(time, getPlayConfig(), bmsirLr2HispeedFixEnabled);
+    }
+
+    public void applyReplayLaneState(bms.player.beatoraja.ReplayLaneState state) {
+        state.apply(playconfig);
+        Boolean fixed = playconfig.getBmsirLr2HispeedFixReplayEnabled();
+        if (fixed != null) bmsirLr2HispeedFixEnabled = fixed;
+        basebpm = switch (playconfig.getFixhispeed()) {
+            case PlayConfig.FIX_HISPEED_STARTBPM -> model.getBpm();
+            case PlayConfig.FIX_HISPEED_MINBPM -> minbpm;
+            case PlayConfig.FIX_HISPEED_MAXBPM -> maxbpm;
+            case PlayConfig.FIX_HISPEED_MAINBPM -> mainbpm;
+            default -> basebpm;
+        };
+        basehispeed = playconfig.getHispeed();
+        if (main.timer.isTimerOn(TIMER_PLAY)) {
+            // Skin numeric properties are prepared before drawLane. Do not replace
+            // the current BPM/scroll with the Start Here anchor during playback.
+            float speed = appliedHispeed(nowbpm, currentscroll);
+            currentduration = bmsirLr2HispeedFixEnabled
+                    ? BMSIRHispeed.currentDuration(speed, nowbpm, currentscroll,
+                            playconfig.isEnablelanecover(), playconfig.getLanecover(),
+                            playconfig.isEnablelift(), playconfig.getLift())
+                    : (int)Math.round(currentscroll > 0 && nowbpm > 0
+                            ? 240000 / nowbpm / speed / currentscroll
+                                    * (1 - (playconfig.isEnablelanecover() ? playconfig.getLanecover() : 0)) : 0);
+        } else updateStartHerePreviewMetrics();
+    }
 
 	public boolean isBmsirLr2HispeedFixEnabled() {
 		return bmsirLr2HispeedFixEnabled;
