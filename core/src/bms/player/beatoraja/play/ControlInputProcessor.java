@@ -21,7 +21,7 @@ public final class ControlInputProcessor {
 
 	private boolean[] hschanged;
 	private long startpressedtime;
-	private long selectpressedtime;
+	private final SelectDoublePress selectDoublePress;
 	private boolean startpressed = false;
 	private boolean selectpressed = false;
 	private boolean startAndSelectPressed = false;
@@ -51,6 +51,8 @@ public final class ControlInputProcessor {
 	public ControlInputProcessor(BMSPlayer player, BMSPlayerMode autoplay) {
 		this.player = player;
 		this.autoplay = autoplay;
+		// A held retry input belongs to the previous screen, not a HIDDEN tap.
+		selectDoublePress = new SelectDoublePress(player.main.getInputProcessor().isSelectPressed());
 		hschanged = new boolean[BMSPlayerInputProcessor.KEYSTATE_SIZE];
 		Arrays.fill(hschanged, true);
 
@@ -243,8 +245,12 @@ public final class ControlInputProcessor {
 	public void input() {
 		final LaneRenderer lanerender = player.getLanerender();
 		final BMSPlayerInputProcessor input = player.main.getInputProcessor();
+		long now = System.currentTimeMillis();
+		boolean controlsActive = enableControl && isLaneControlActive(player.getState());
+		boolean toggleHidden = selectDoublePress.update(input.isSelectPressed(),
+				controlsActive && !input.startPressed(), now);
 		// 各種コントロール入力判定
-		if (enableControl) {
+		if (controlsActive) {
 			if (enableCursor) {
 				if (input.getControlKeyState(ControlKeys.UP)) {
 					if (!cursorpressed) {
@@ -302,14 +308,8 @@ public final class ControlInputProcessor {
 				} else if ((autoplay.mode == BMSPlayerMode.Mode.PLAY || autoplay.mode == BMSPlayerMode.Mode.PRACTICE) && !selectpressed) {
 					Arrays.fill(hschanged, true);
 				}
-				if (!selectpressed) {
-					long stime = System.currentTimeMillis();
-					if (stime < selectpressedtime + 500) {
-						lanerender.setEnableHidden(!lanerender.isEnableHidden());
-						selectpressedtime = 0;
-					} else {
-						selectpressedtime = stime;
-					}
+				if (toggleHidden) {
+					lanerender.setEnableHidden(!lanerender.isEnableHidden());
 				}
 				selectpressed = true;
 			} else {
@@ -325,7 +325,6 @@ public final class ControlInputProcessor {
 			}
 		}
 		boolean abortBlocked = BMSIRArenaClient.isAbortInputBlocked();
-		long now = System.currentTimeMillis();
 		if(!abortBlocked && ((input.startPressed() && input.isSelectPressed() && now - exitpressedtime > exitPressDuration )||
 				(player.isNoteEnd() && (input.startPressed() || input.isSelectPressed())))){
 			input.startChanged(false);
@@ -351,6 +350,36 @@ public final class ControlInputProcessor {
 			} else {
 				player.setPlaySpeed(100);
 			}
+		}
+	}
+
+	static boolean isLaneControlActive(int state) {
+		return state != BMSPlayer.STATE_FAILED && state != BMSPlayer.STATE_FINISHED
+				&& state != BMSPlayer.STATE_ABORTED && state != BMSPlayer.STATE_PRACTICE_FINISHED;
+	}
+
+	static final class SelectDoublePress {
+		private boolean pressed;
+		private long previousPress = -1;
+
+		SelectDoublePress(boolean initiallyPressed) {
+			pressed = initiallyPressed;
+		}
+
+		boolean update(boolean down, boolean eligible, long now) {
+			if (!eligible) {
+				// Exit chords and closing screens cannot arm the next double press.
+				previousPress = -1;
+				pressed = down;
+				return false;
+			}
+			boolean toggle = false;
+			if (down && !pressed) {
+				toggle = previousPress >= 0 && now >= previousPress && now - previousPress < 500;
+				previousPress = toggle ? -1 : now;
+			}
+			pressed = down;
+			return toggle;
 		}
 	}
 
