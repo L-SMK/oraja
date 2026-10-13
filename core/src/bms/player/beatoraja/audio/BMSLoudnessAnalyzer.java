@@ -46,7 +46,8 @@ public class BMSLoudnessAnalyzer {
 		}
 
 		public float calculateAdjustedVolume(float baseVolume) {
-			if (!success || Double.isNaN(loudnessLUFS)) {
+            if (!Float.isFinite(baseVolume) || baseVolume <= 0f) return 0f;
+			if (!success || !Double.isFinite(loudnessLUFS)) {
 				return baseVolume;
 			}
 
@@ -56,7 +57,7 @@ public class BMSLoudnessAnalyzer {
 			double loudnessDiff = loudnessLUFS - AVERAGE_LUFS;
 			double gainAdjustment = Math.pow(10.0, -loudnessDiff / 20.0);
 
-			float adjustedVolume = (float) (0.5f * gainAdjustment);
+			float adjustedVolume = (float) (baseVolume * gainAdjustment);
 			return Math.max(0.0f, Math.min(1.0f, adjustedVolume));
 		}
 	}
@@ -113,7 +114,7 @@ public class BMSLoudnessAnalyzer {
 	private AnalysisResult analyze(BMSModel model) {
 		try {
 			// Check cache first
-			String hash = model.getSHA256();
+			String hash = bms.player.beatoraja.BMSIRParserCompatibility.storageHash(model, model.getSHA256());
 			if (hash != null && !hash.isEmpty()) {
 				Double value = readFromCache(hash);
 				if (value != null) {

@@ -14,7 +14,7 @@ import bms.player.beatoraja.play.JudgeAlgorithm;
 public class IRScoreData {
 
 	/**
-	 * 譜面のハッシュ値
+	 * ローカル成績の識別キー。公開譜面の識別はIRChartDataを使用する。
 	 */
 	public final String sha256;
 	/**

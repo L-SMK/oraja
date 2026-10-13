@@ -39,6 +39,8 @@ public final class ReplayData implements Validatable {
 	 * モード
 	 */
 	public int mode;
+    /** Missing in old files means the historical BMS parser, never an inferred migration. */
+    public int bmsirParserRevision = 1;
 	/** Missing in older replays: retain the chart-authored LN interpretation. */
 	public boolean bmsirForcedLongNotes;
 	/**
@@ -142,6 +144,7 @@ public final class ReplayData implements Validatable {
 	@Override
 	public boolean validate() {
 		if (bmsirForcedLongNotes && (mode < 0 || mode > 2)) return false;
+        if (bmsirParserRevision < 1 || bmsirParserRevision > BMSIRParserCompatibility.CURRENT_REVISION) return false;
 		if (keyinput != null) {
 			try {
 				InputStream input = new ByteArrayInputStream(keyinput.getBytes());
