@@ -1663,6 +1663,22 @@ platform build.
   `2`; direction flags use the most recent 500 ms. An optional second
   duration argument is clamped to 50--2000 ms.
 
+## SELECT retry and HIDDEN controls
+
+START+SELECT exit input and SELECT quick retry do not count toward HIDDEN's
+double press. Closing states (including abort before the first judgment or
+during loading) stop lane-setting adjustments, and a SELECT held into the next
+play must be released before it can arm a fresh double press. During loading,
+READY, and play, two fresh SELECT-only presses less than 500 ms apart still
+toggle HIDDEN. SELECT+keys/scratch green-number adjustments remain available.
+No saved HIDDEN setting or configuration format is changed.
+
+日本語: 終了のSTART＋SELECTとリトライのSELECTをHIDDENの連打判定に含めません。
+終了後のカバー等の調整は停止し、次のプレイまで押し続けたSELECTは一度離してから
+連打判定を開始します。通常のSELECT単独2回押しと緑数字調整は従来どおりです。
+実機では、ロード中／最初の判定前／判定後の終了からSELECTリトライを行い、
+HIDDENが変わらないことと、通常の2回押しでON/OFFできることを確認してください。
+
 ## CONSTANT and scroll modification
 
 Music Select's SELECT assist-panel CONSTANT key toggles LR2-style CONSTANT /
