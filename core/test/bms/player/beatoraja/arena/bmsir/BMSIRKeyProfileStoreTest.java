@@ -27,6 +27,32 @@ class BMSIRKeyProfileStoreTest {
     Path directory;
 
     @Test
+    void multipleBindingsSurviveAllModesAndKeysOnlyApplication() {
+        PlayerConfig original = new PlayerConfig();
+        for (int mode : BMSIRKeyProfileStore.MODE_IDS) {
+            original.getPlayConfig(mode).setMultiInputEnabled(true);
+            original.getPlayConfig(mode).getKeyboardConfig().setAdditionalBindings(new int[][]{{Keys.T}});
+        }
+        Profile profile = BMSIRKeyProfileStore.snapshot("multiple", original);
+        PlayerConfig all = new PlayerConfig();
+        BMSIRKeyProfileStore.apply(profile, all, Scope.ALL, 7);
+        for (int mode : BMSIRKeyProfileStore.MODE_IDS) {
+            assertTrue(all.getPlayConfig(mode).isMultiInputEnabled());
+            assertArrayEquals(new int[]{Keys.T}, all.getPlayConfig(mode).getKeyboardConfig().getAdditionalBindings()[0]);
+        }
+        PlayerConfig keysOnly = new PlayerConfig();
+        keysOnly.getMode7().getPlayconfig().setHispeed(6f);
+        BMSIRKeyProfileStore.apply(profile, keysOnly, Scope.KEYS_ONLY, 7);
+        assertTrue(keysOnly.getMode7().isMultiInputEnabled());
+        assertArrayEquals(new int[]{Keys.T}, keysOnly.getMode7().getKeyboardConfig().getAdditionalBindings()[0]);
+        assertEquals(6f, keysOnly.getMode7().getPlayconfig().getHispeed());
+        PlayerConfig current = new PlayerConfig();
+        BMSIRKeyProfileStore.apply(profile, current, Scope.CURRENT_MODE, 7);
+        assertTrue(current.getMode7().isMultiInputEnabled());
+        assertFalse(current.getMode14().isMultiInputEnabled());
+    }
+
+    @Test
     void missingFileIsEmptyAndRoundTripKeepsEveryMode() throws Exception {
         String root = directory.toString();
         assertTrue(BMSIRKeyProfileStore.load(root).isEmpty());
