@@ -221,7 +221,7 @@ public final class GrooveGauge {
 		}
 
 		public int getDisplayValue() {
-			return integerGauge == null ? (int) value : integerGauge.displayPercent();
+			return integerGauge == null ? GaugeDisplay.integerPart(value) : integerGauge.displayPercent();
 		}
 
 		public void setValue(float value) {

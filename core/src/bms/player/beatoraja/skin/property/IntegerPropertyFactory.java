@@ -343,8 +343,7 @@ public class IntegerPropertyFactory {
 					if (bms.player.beatoraja.play.NantokaManiaRules.isActive(state.resource.getBMSModel())) {
 						return (int) (state.resource.getGauge()[gaugeType].peek() / 2) * 2;
 					}
-					return (int) state.resource.getGauge()[gaugeType]
-							.get(state.resource.getGauge()[gaugeType].size - 1);
+					return GaugeDisplay.integerPart(state.resource.getGauge()[gaugeType].peek());
 				}
 				return Integer.MIN_VALUE;
 			};
@@ -352,10 +351,16 @@ public class IntegerPropertyFactory {
 			return (state) -> {
 				if (state instanceof BMSPlayer) {
 					final GrooveGauge gauge = ((BMSPlayer) state).getGauge();
+					if (!NantokaManiaRules.isActive(state.resource.getBMSModel())) {
+						return GaugeDisplay.fractionalPart(gauge.getValue());
+					}
 					return gauge.getValue() > 0 && gauge.getValue() < 0.1 ? 1 : ((int) (gauge.getValue() * 10)) % 10;
 				}
 				if (state instanceof AbstractResult) {
 					final int gaugeType = ((AbstractResult) state).getGaugeType();
+					if (!NantokaManiaRules.isActive(state.resource.getBMSModel())) {
+						return GaugeDisplay.fractionalPart(state.resource.getGauge()[gaugeType].peek());
+					}
 					float value = state.resource.getGauge()[gaugeType]
 							.get(state.resource.getGauge()[gaugeType].size - 1) * 10;
 					if (value > 0 && value < 1)
