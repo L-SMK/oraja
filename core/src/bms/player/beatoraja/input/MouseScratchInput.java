@@ -80,18 +80,18 @@ public class MouseScratchInput {
             for (int i=0; i<keys.length; i++) {
                 final int axis = keys[i];
                 if (axis >= 0 && mouseScratchChanged[axis]) {
-                    this.bmsPlayerInputProcessor.keyChanged(keyboardInputProcessor, microtime, i, mouseScratchState[axis]);
+                    this.bmsPlayerInputProcessor.keyChanged(this, keyboardInputProcessor, microtime, i, mouseScratchState[axis]);
                     mouseScratchChanged[axis] = false;
                 }
             }
 
             if (control[0] >= 0 && mouseScratchChanged[control[0]]) {
-                this.bmsPlayerInputProcessor.startChanged(mouseScratchState[control[0]]);
+                this.bmsPlayerInputProcessor.startChanged(this, mouseScratchState[control[0]]);
                 mouseScratchChanged[control[0]] = false;
             }
 
             if (control[1] >= 0 && mouseScratchChanged[control[1]]) {
-                this.bmsPlayerInputProcessor.setSelectPressed(mouseScratchState[control[1]]);
+                this.bmsPlayerInputProcessor.selectChanged(this, mouseScratchState[control[1]]);
                 mouseScratchChanged[control[1]] = false;
             }
 
@@ -151,10 +151,9 @@ public class MouseScratchInput {
         for (int index = 0; index < keys.length; index++) {
             int axis = keys[index];
             if (axis >= 0
-                    && mouseScratchState[axis]
-                    && !keyboardInputProcessor.isPhysicalKeyPressed(index)) {
+                    && mouseScratchState[axis]) {
                 bmsPlayerInputProcessor.keyChanged(
-                        keyboardInputProcessor,
+                        this, keyboardInputProcessor,
                         microtime,
                         index,
                         false
@@ -165,14 +164,12 @@ public class MouseScratchInput {
             }
         }
         if (control[0] >= 0
-                && mouseScratchState[control[0]]
-                && !keyboardInputProcessor.isPhysicalStartPressed()) {
-            bmsPlayerInputProcessor.startChanged(false);
+                && mouseScratchState[control[0]]) {
+            bmsPlayerInputProcessor.startChanged(this, false);
         }
         if (control[1] >= 0
-                && mouseScratchState[control[1]]
-                && !keyboardInputProcessor.isPhysicalSelectPressed()) {
-            bmsPlayerInputProcessor.setSelectPressed(false);
+                && mouseScratchState[control[1]]) {
+            bmsPlayerInputProcessor.selectChanged(this, false);
         }
         Arrays.fill(mouseScratchState, false);
         Arrays.fill(mouseScratchChanged, false);

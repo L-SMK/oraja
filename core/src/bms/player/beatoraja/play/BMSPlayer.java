@@ -94,6 +94,14 @@ public class BMSPlayer extends MainState {
 	 * リプレイHS保存用 STATE READY時に保存
 	 */
 	private PlayConfig replayConfig;
+    private ReplayLaneTimeline laneTimeline;
+    private bms.player.beatoraja.ReplayLaneState replayLaneInitial;
+
+    public boolean restoresReplayLaneSettings() {
+        return resource.getPlayMode().mode == BMSPlayerMode.Mode.REPLAY
+                && bms.player.beatoraja.ReplayLaneState.canRestore(replay,
+                        resource.getConfig().isReplayLaneSettings(), resource.getConstraint());
+    }
 
 	static final int TIME_MARGIN = 5000;
 	private static final long LOUDNESS_ANALYSIS_TIMEOUT_NANOS = TimeUnit.SECONDS.toNanos(15);
@@ -897,6 +905,14 @@ public class BMSPlayer extends MainState {
 			input.setEnable(false);
 		}
 		lanerender = new LaneRenderer(this, model);
+        if (restoresReplayLaneSettings()) {
+            replayLaneInitial = bms.player.beatoraja.ReplayLaneState.capture(0, replay.config,
+                    replay.config.getBmsirLr2HispeedFixReplayEnabled() != null
+                            ? replay.config.getBmsirLr2HispeedFixReplayEnabled()
+                            : config.isBmsirLr2HispeedFixEnabled());
+            laneTimeline = new ReplayLaneTimeline(replayLaneInitial, replay.laneStates);
+            lanerender.applyReplayLaneState(replayLaneInitial);
+        }
 		BMSIRArenaClient.tracePlayPhase("lane_renderer_ready", this);
 		for (CourseData.CourseDataConstraint i : resource.getConstraint()) {
 			if (i == NO_SPEED) {
@@ -967,6 +983,7 @@ public class BMSPlayer extends MainState {
 		final PlayerConfig config = resource.getPlayerConfig();
 
 		final long micronow = timer.getNowMicroTime();
+
 
 		if(micronow > skin.getInput() * 1000){
 			timer.switchTimer(TIMER_STARTINPUT, true);
@@ -1131,7 +1148,11 @@ public class BMSPlayer extends MainState {
 				}
 				if (timer.getNowTime(TIMER_READY) > skin.getPlaystart()
 						&& BMSIRArenaClient.isArenaStartReleased()) {
+                    if (restoresReplayLaneSettings()) lanerender.applyReplayLaneState(replayLaneInitial);
 					replayConfig = lanerender.getPlayConfig().clone();
+                    if (!restoresReplayLaneSettings()) {
+                        laneTimeline = new ReplayLaneTimeline(lanerender.captureReplayLaneState(0), null);
+                    }
 					saveConfig();
 					state = STATE_PLAY;
 					TimingDiagnostics.playStageChanged("ACTIVE_PLAY");
@@ -1355,6 +1376,12 @@ public class BMSPlayer extends MainState {
 			}
 		}
 
+        if (restoresReplayLaneSettings() && laneTimeline != null) {
+            lanerender.applyReplayLaneState(timer.isTimerOn(TIMER_PLAY)
+                    ? laneTimeline.at(Math.max(0, timer.getNowMicroTime(TIMER_PLAY))) : replayLaneInitial);
+        } else if (state == STATE_PLAY && laneTimeline != null) {
+            laneTimeline.record(lanerender.captureReplayLaneState(timer.getNowMicroTime(TIMER_PLAY)));
+        }
 		prevtime = micronow;
 	}
 
@@ -1499,6 +1526,7 @@ public class BMSPlayer extends MainState {
 	}
 
 	private void saveConfig() {
+        if (resource.getPlayMode().mode == BMSPlayerMode.Mode.REPLAY) return;
 		for (CourseData.CourseDataConstraint c : resource.getConstraint()) {
 			if (c == NO_SPEED) {
 				return;
@@ -1605,6 +1633,8 @@ public class BMSPlayer extends MainState {
 			replay.bmsirManiacPlacementHash = maniacContext.placementHash();
 		}
 		replay.config = replayConfig;
+        replay.laneStateVersion = 1;
+        replay.laneStates = laneTimeline == null ? new bms.player.beatoraja.ReplayLaneState[0] : laneTimeline.recorded();
 
 		score.setPassnotes(judge.getPastNotes());
 		score.setMinbp(score.getEbd() + score.getLbd() + score.getEpr() + score.getLpr() + score.getEms() + score.getLms() + resource.getSongdata().getNotes() - judge.getPastNotes());

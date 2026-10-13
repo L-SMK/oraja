@@ -33,6 +33,7 @@ public final class MidiInputProcessor extends BMSPlayerInputDevice implements Au
 	// MIDI note number -> game key number
 	// NOTE: この方法だと1つのMIDIキーに複数キー割り当てが不可能
 	KeyHandler[] keyMap = new KeyHandler[MaxKeys];
+    private final ArrayList<Object> heldSources = new ArrayList<>();
 
 	KeyHandler pitchBendUp, pitchBendDown;
 
@@ -64,33 +65,43 @@ public final class MidiInputProcessor extends BMSPlayerInputDevice implements Au
 		devices.forEach(MidiDevice::close);
 	}
 
-	public void setConfig(MidiConfig config) {
-		clear();
-		clearHandlers();
-
-		MidiConfig.Input[] keys = config.getKeys();
-		for (int i=0; i<keys.length; i++) {
-			final int key = i;
-			setHandler(keys[i], pressed -> {
-				bmsPlayerInputProcessor.keyChanged(this, currentTime(), key, pressed);
-				bmsPlayerInputProcessor.setAnalogState(key, false, 0);
-			});
-		}
-
-		setHandler(config.getStart(), pressed -> {
-			bmsPlayerInputProcessor.startChanged(pressed);
-		});
-		setHandler(config.getSelect(), pressed -> {
-			bmsPlayerInputProcessor.setSelectPressed(pressed);
-		});
-		setHandler(config.getDiffFilter(), pressed -> diffFilterPressed = pressed);
-	}
+    public void setConfig(MidiConfig config) { setConfig(config, false); }
+    public void setConfig(MidiConfig config, boolean multi) {
+        clear();
+        clearHandlers();
+        heldSources.clear();
+        MidiConfig.Input[] keys = config.getKeys();
+        for (int index = 0; index < keys.length + 2; index++) {
+            final int logical = index;
+            MidiConfig.Input primary = index < keys.length ? keys[index]
+                    : (index == keys.length ? config.getStart() : config.getSelect());
+            ArrayList<MidiConfig.Input> bindings = new ArrayList<>();
+            if (primary != null) bindings.add(primary);
+            MidiConfig.Input[][] additional = config.getAdditionalBindings();
+            if (multi && additional != null && index < additional.length && additional[index] != null) {
+                bindings.addAll(Arrays.asList(additional[index]));
+            }
+            for (MidiConfig.Input binding : bindings) {
+                Object source = new Object();
+                heldSources.add(source);
+                setHandler(binding, pressed -> {
+                    if (logical < keys.length) {
+                        bmsPlayerInputProcessor.keyChanged(source, this, currentTime(), logical, pressed);
+                        bmsPlayerInputProcessor.setAnalogState(logical, false, 0);
+                    } else if (logical == keys.length) bmsPlayerInputProcessor.startChanged(source, pressed);
+                    else bmsPlayerInputProcessor.selectChanged(source, pressed);
+                });
+            }
+        }
+        setHandler(config.getDiffFilter(), pressed -> diffFilterPressed = pressed);
+    }
 
 	public void setStartTime(long starttime) {
 		this.starttime = starttime;
 	}
 
 	public void clear() {
+        for (Object source : heldSources) bmsPlayerInputProcessor.releaseSource(source);
 		lastPressedKeyAvailable = false;
 		diffFilterPressed = false;
 	}
@@ -106,7 +117,7 @@ public final class MidiInputProcessor extends BMSPlayerInputDevice implements Au
 	}
 
 	void setHandler(MidiConfig.Input input, KeyHandler handler) {
-		if (input == null)
+		if (input == null || input.type == null)
 			return;
 		switch (input.type) {
 			case NOTE:

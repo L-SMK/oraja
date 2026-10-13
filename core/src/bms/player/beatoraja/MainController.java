@@ -885,6 +885,7 @@ public class MainController {
 		if (screenshot != null && screenshot.isAlive()) {
 			return;
 		}
+		final MainState screenshotState = current;
 		final byte[] pixels = ScreenUtils.getFrameBufferPixels(
 				0,
 				0,
@@ -896,7 +897,13 @@ public class MainController {
 			for (int index = 3; index < pixels.length; index += 4) {
 				pixels[index] = (byte) 0xff;
 			}
-			new ScreenShotFileExporter().send(current, pixels);
+            boolean saved = new ScreenShotFileExporter().send(screenshotState, pixels);
+            if (saved && config.isScreenshotSound()) {
+                Gdx.app.postRunnable(() -> {
+                    if (sound != null) sound.play(SystemSoundManager.SoundType.SCREENSHOT, false,
+                            config.getScreenshotSoundVolume());
+                });
+            }
 		});
 		screenshot.start();
 		saveLastRecording("ON_SCREENSHOT");

@@ -90,6 +90,7 @@ public class ScreenShotFileExporter implements ScreenShotExporter {
             Config.ScreenShotFormat format = currentState.resource.getConfig().getScreenshotFormat();
             String path = "screenshot/" + sdf.format(Calendar.getInstance().getTime())
                     + stateName + extensionFor(format);
+            java.nio.file.Files.createDirectories(Paths.get(path).getParent());
             BufferUtils.copy(pixels, 0, pixmap.getPixels(), pixels.length);
             if (format == Config.ScreenShotFormat.JPG) {
                 BufferedImage image = new BufferedImage(
@@ -102,7 +103,9 @@ public class ScreenShotFileExporter implements ScreenShotExporter {
                         image.setRGB(x, y, pixmap.getPixel(x, y) >>> 8);
                     }
                 }
-                ImageIO.write(image, "jpg", new File(path));
+                if (!ImageIO.write(image, "jpg", new File(path))) {
+                    throw new IOException("No JPEG writer available");
+                }
             } else {
                 PixmapIO.writePNG(new FileHandle(path), pixmap);
             }

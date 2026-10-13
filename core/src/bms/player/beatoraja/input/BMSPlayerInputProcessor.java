@@ -87,9 +87,18 @@ public class BMSPlayerInputProcessor extends ControllerAdapter {
 		BMControllerInputProcessor[] updated = Arrays.copyOf(bminput, bminput.length + 1);
 		updated[updated.length - 1] = input;
 		bminput = updated;
-		if (currentControllerConfig != null) {
-			setControllerConfig(currentControllerConfig);
-		}
+        if (currentControllerConfig != null) {
+            boolean assigned = false;
+            for (ControllerConfig candidate : currentControllerConfig) {
+                if (candidate.getName() == null || candidate.getName().isBlank()) candidate.setName(name);
+                if (name.equals(candidate.getName()) || legacyControllerName(name).equals(candidate.getName())) {
+                    input.setConfig(candidate, currentMultiInput);
+                    assigned = true;
+                    break;
+                }
+            }
+            input.setEnable(assigned);
+        }
 		logger.info("コントローラーを検出 : {}", name);
 	}
 
@@ -111,11 +120,9 @@ public class BMSPlayerInputProcessor extends ControllerAdapter {
 		System.arraycopy(current, removedIndex + 1, updated, removedIndex,
 				current.length - removedIndex - 1);
 		bminput = updated;
-		resetAllKeyState();
+        releaseSource(current[removedIndex]);
 		Arrays.fill(isAnalog, false);
 		Arrays.fill(currentAnalogValue, 0);
-		startPressed = false;
-		selectPressed = false;
 		return true;
 	}
 
@@ -177,6 +184,7 @@ public class BMSPlayerInputProcessor extends ControllerAdapter {
 	 * 全モードの入力が収まる大きさにしておく
 	 */
 	private boolean[] keystate = new boolean[KEYSTATE_SIZE];
+    private final InputSourceState heldSources = new InputSourceState(KEYSTATE_SIZE + 2);
 	/**
 	 * 各キーの最終更新時間
 	 */
@@ -231,7 +239,7 @@ public class BMSPlayerInputProcessor extends ControllerAdapter {
 					configs[i].setName(controller.getName());
 				}
 				if(controller.getName().equals(configs[i].getName())) {
-					controller.setConfig(configs[i]);
+					controller.setConfig(configs[i], currentMultiInput);
 					controller.setEnable(true);
 					b[i] = true;
 					break;
@@ -314,6 +322,7 @@ public class BMSPlayerInputProcessor extends ControllerAdapter {
 	 * 全てのキー状態をリセットする
 	 */
 	public void resetAllKeyState() {
+		heldSources.clear();
 		Arrays.fill(keystate, false);
 		Arrays.fill(time, Long.MIN_VALUE);
 	}
@@ -334,39 +343,39 @@ public class BMSPlayerInputProcessor extends ControllerAdapter {
 	}
 
 	public void setPlayConfig(PlayModeConfig playconfig) {
-		// KB, コントローラー, Midiの各ボタンについて排他的処理を実施
-		int[] kbkeys = playconfig.getKeyboardConfig().getKeyAssign();
-		boolean[] exclusive = new boolean[kbkeys.length];
-		for(int i = kbkeys.length;i < keystate.length;i++) {
-			keystate[i] = false;
-			time[i] = Long.MIN_VALUE;
-		}
-		
-		int kbcount = setPlayConfig0(kbkeys,  exclusive);
-		
-		int[][] cokeys = new int[playconfig.getController().length][];
-		int cocount = 0;
-		for(int i = 0;i < cokeys.length;i++) {
-			cokeys[i] = playconfig.getController()[i].getKeyAssign();
-			cocount += setPlayConfig0(cokeys[i],  exclusive);
-		}
-				
-		MidiConfig.Input[] mikeys  = playconfig.getMidiConfig().getKeys();
-		int micount = 0;
-		for(int i = 0;i < mikeys.length;i++) {
-			if(exclusive[i]) {
-				mikeys[i] = null;
-			} else {
-				exclusive[i] = true;
-				micount++;
-			}
-		}
-		
-		// 各デバイスにキーコンフィグをセット
-		kbinput.setConfig(playconfig.getKeyboardConfig());
-		setControllerConfig(playconfig.getController());
-		midiinput.setConfig(playconfig.getMidiConfig());
-		
+        // Never mutate serialized bindings when applying the legacy device priority.
+        com.badlogic.gdx.utils.Json json = new com.badlogic.gdx.utils.Json();
+        PlayModeConfig effective = json.fromJson(PlayModeConfig.class, json.toJson(playconfig));
+        boolean[] exclusive = new boolean[effective.getKeyboardConfig().getKeyAssign().length];
+        int kbcount = countAssigned(effective.getKeyboardConfig().getKeyAssign());
+        int cocount = 0;
+        for (ControllerConfig controller : effective.getController()) cocount += countAssigned(controller.getKeyAssign());
+        int micount = (int)java.util.Arrays.stream(effective.getMidiConfig().getKeys()).filter(java.util.Objects::nonNull).count();
+        if (!effective.isMultiInputEnabled()) {
+            setPlayConfig0(effective.getKeyboardConfig().getKeyAssign(), exclusive);
+            for (ControllerConfig controller : effective.getController()) setPlayConfig0(controller.getKeyAssign(), exclusive);
+            for (int index = 0; index < exclusive.length; index++) {
+                if (exclusive[index]) effective.getMidiConfig().getKeys()[index] = null;
+            }
+        }
+        kbcount = countAssigned(effective.getKeyboardConfig().getKeyAssign(),
+                effective.getKeyboardConfig().getAdditionalBindings(), effective.isMultiInputEnabled());
+        cocount = 0;
+        for (ControllerConfig controller : effective.getController()) cocount += countAssigned(controller.getKeyAssign(),
+                controller.getAdditionalBindings(), effective.isMultiInputEnabled());
+        micount = 0;
+        MidiConfig.Input[] midiKeys = effective.getMidiConfig().getKeys();
+        MidiConfig.Input[][] midiExtra = effective.getMidiConfig().getAdditionalBindings();
+        for (int index = 0; index < midiKeys.length; index++) {
+            if (midiKeys[index] != null || effective.isMultiInputEnabled() && midiExtra != null && index < midiExtra.length
+                    && midiExtra[index] != null && midiExtra[index].length > 0) micount++;
+        }
+        resetAllKeyState();
+        kbinput.setConfig(effective.getKeyboardConfig(), effective.isMultiInputEnabled());
+        currentMultiInput = effective.isMultiInputEnabled();
+        setControllerConfig(effective.getController());
+        midiinput.setConfig(effective.getMidiConfig(), effective.isMultiInputEnabled());
+
 		if(kbcount >= cocount && kbcount >= micount) {
 			type = Type.KEYBOARD;
 		} else if(cocount >= kbcount && cocount >= micount) {
@@ -380,6 +389,18 @@ public class BMSPlayerInputProcessor extends ControllerAdapter {
 		return type;
 	}
 	
+    private boolean currentMultiInput;
+    private static int countAssigned(int[] keys, int[][] extra, boolean multi) {
+        int count = 0;
+        for (int index = 0; index < keys.length; index++) {
+            if (keys[index] >= 0 || multi && extra != null && index < extra.length
+                    && extra[index] != null && extra[index].length > 0) count++;
+        }
+        return count;
+    }
+    private static int countAssigned(int[] keys) {
+        return (int)Arrays.stream(keys).filter(key -> key >= 0).count();
+    }
 	private int setPlayConfig0(int[] keys, boolean[] exclusive) {
 		int count = 0;
 		for(int i = 0;i < keys.length;i++) {
@@ -439,9 +460,15 @@ public class BMSPlayerInputProcessor extends ControllerAdapter {
 	}
 	
 	protected void keyChanged(BMSPlayerInputDevice device, long presstime, int i, boolean pressed) {
+        keyChanged(device, device, presstime, i, pressed);
+    }
+
+    protected synchronized void keyChanged(Object source, BMSPlayerInputDevice device, long presstime, int i, boolean pressed) {
 		if (!enable) {
 			return;
 		}
+        if (i < 0 || i >= keystate.length) return;
+        pressed = heldSources.update(source, i, pressed);
 		if (keystate[i] != pressed) {
 			keystate[i] = pressed;
 			time[i] = presstime;
@@ -495,9 +522,30 @@ public class BMSPlayerInputProcessor extends ControllerAdapter {
 		return keylog.toArray();
 	}
 
-	public void startChanged(boolean pressed) {
-		startPressed = pressed;
-	}
+    public synchronized void startChanged(boolean pressed) {
+        if (!pressed) heldSources.clearKey(KEYSTATE_SIZE);
+        startPressed = pressed;
+    }
+    public synchronized void startChanged(Object source, boolean pressed) {
+        startPressed = heldSources.update(source, KEYSTATE_SIZE, pressed);
+    }
+    public synchronized void selectChanged(Object source, boolean pressed) {
+        selectPressed = heldSources.update(source, KEYSTATE_SIZE + 1, pressed);
+    }
+    public synchronized void releaseSource(Object source) {
+        heldSources.remove(source);
+        long now = System.nanoTime() / 1000 - starttime;
+        for (int index = 0; index < keystate.length; index++) {
+            boolean held = heldSources.held(index);
+            if (keystate[index] && !held) {
+                keystate[index] = false;
+                time[index] = now;
+                if (starttime != 0 && enable) keylog.add(now - microMarginTime, index, false);
+            }
+        }
+        startPressed = heldSources.held(KEYSTATE_SIZE);
+        selectPressed = heldSources.held(KEYSTATE_SIZE + 1);
+    }
 
 	public boolean startPressed() {
 		return startPressed;
@@ -579,6 +627,7 @@ public class BMSPlayerInputProcessor extends ControllerAdapter {
 	}
 
 	public void setSelectPressed(boolean selectPressed) {
+		if (!selectPressed) heldSources.clearKey(KEYSTATE_SIZE + 1);
 		this.selectPressed = selectPressed;
 	}
 
