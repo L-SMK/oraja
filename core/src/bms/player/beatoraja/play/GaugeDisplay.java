@@ -1,14 +1,10 @@
 package bms.player.beatoraja.play;
 
-/** Numeric skin display for ordinary floating-point gauges. */
+/** Keep an integer skin display from showing zero while gauge remains. */
 public final class GaugeDisplay {
     private GaugeDisplay() {}
 
-    public static int integerPart(float value) {
-        return value > 0f && value < 1f ? 1 : (int) value;
-    }
-
-    public static int fractionalPart(float value) {
-        return value > 0f && value < 1f ? 0 : ((int) (value * 10)) % 10;
+    public static int minimumPositivePercent(float value, int displayValue) {
+        return value > 0f ? Math.max(1, displayValue) : displayValue;
     }
 }
