@@ -130,7 +130,7 @@ public class RankingDataCache {
     }
 
     private String chartKey(SongData song, IRRankingContext context) {
-        return song.getSha256() + (context.forceLn()
+        return bms.player.beatoraja.BMSIRParserCompatibility.storageHash(song, song.getSha256()) + (context.forceLn()
                 && BMSIRLongNoteMode.separatesScore(song) ? ":forced-ln" : "");
     }
 

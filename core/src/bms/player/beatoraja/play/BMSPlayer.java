@@ -129,6 +129,7 @@ public class BMSPlayer extends MainState {
 	private boolean allReady = false;
 
 	private float adjustedVolume = -1.f;
+    private volatile BMSLoudnessAnalyzer.AnalysisResult normalizationResult;
 	private boolean analysisChecked = false;
 	private Future<BMSLoudnessAnalyzer.AnalysisResult> analysisTask;
 	private long analysisWaitStartedNanos;
@@ -327,7 +328,10 @@ public class BMSPlayer extends MainState {
 			// legacy authored CN/HCN and the recorded #RANDOM branch.
 			BMSModel recordedModel = resource.loadBMSModelForReplay(replay);
 			if (recordedModel == null) throw new IllegalStateException("Cannot decode replay chart");
+            boolean changedInterpretation = "1".equals(model.getValues().get(BMSDecoder.COMPATIBILITY_AFFECTED))
+                    || "1".equals(recordedModel.getValues().get(BMSDecoder.COMPATIBILITY_AFFECTED));
 			model = recordedModel;
+            if (changedInterpretation) resource.installRecordedReplayModel(recordedModel);
 		}
 		// 通常プレイの場合は最後のノーツ、オートプレイの場合はBG/BGAを含めた最後のノーツ
 		playtime = (autoplay.mode == BMSPlayerMode.Mode.AUTOPLAY ? model.getLastTime() : model.getLastNoteTime()) + TIME_MARGIN;
@@ -1433,8 +1437,14 @@ public class BMSPlayer extends MainState {
 		return state;
 	}
 
+    public float getAdjustedBackgroundVolume() {
+        return normalizedVolume(main.getConfig().getAudioConfig().getBgvolume());
+    }
+    private float normalizedVolume(float configured) {
+        return normalizationResult != null ? normalizationResult.calculateAdjustedVolume(configured) : -1f;
+    }
 	public float getAdjustedVolume() {
-		return adjustedVolume;
+        return normalizedVolume(main.getConfig().getAudioConfig().getKeyvolume());
 	}
 
 	private boolean pollLoudnessAnalysis() {
@@ -1470,8 +1480,8 @@ public class BMSPlayer extends MainState {
 		try {
 			BMSLoudnessAnalyzer.AnalysisResult result = analysisTask.get();
 			if (result.success) {
-				float configVolume = main.getConfig().getAudioConfig().getKeyvolume();
-				adjustedVolume = result.calculateAdjustedVolume(configVolume);
+                normalizationResult = result;
+                adjustedVolume = result.calculateAdjustedVolume(main.getConfig().getAudioConfig().getKeyvolume());
 				logger.info("Volume set to {} ({} LUFS)", adjustedVolume, result.loudnessLUFS);
 			} else {
 				logger.warn("Analysis failed: {}", result.errorMessage);
@@ -1633,6 +1643,7 @@ public class BMSPlayer extends MainState {
 			replay.bmsirManiacPlacementHash = maniacContext.placementHash();
 		}
 		replay.config = replayConfig;
+        replay.bmsirParserRevision = BMSIRParserCompatibility.CURRENT_REVISION;
         replay.laneStateVersion = 1;
         replay.laneStates = laneTimeline == null ? new bms.player.beatoraja.ReplayLaneState[0] : laneTimeline.recorded();
 

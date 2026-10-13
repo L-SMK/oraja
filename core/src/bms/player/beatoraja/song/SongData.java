@@ -126,6 +126,9 @@ public class SongData implements Validatable, IpfsInformation {
 	private String parent = "";
 
 	private BMSModel model;
+    private int parsercompatibility;
+    public int getParsercompatibility() { return parsercompatibility; }
+    public void setParsercompatibility(int revision) { parsercompatibility = revision; }
 	private TimeLine[] timelines;
 	private SongInformation info;
 	private NotesRadar notesRadar;
@@ -147,6 +150,8 @@ public class SongData implements Validatable, IpfsInformation {
 			return;
 		}
 		this.model = model;
+        parsercompatibility = "1".equals(model.getValues().get(BMSDecoder.COMPATIBILITY_REVISION)) ? 1
+                : bms.player.beatoraja.BMSIRParserCompatibility.affected(model) ? 3 : 2;
 		BMSPlayerRule.validate(model);
 		setTitle(model.getTitle());
 		setSubtitle(model.getSubTitle());
