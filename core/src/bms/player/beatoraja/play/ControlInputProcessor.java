@@ -246,7 +246,7 @@ public final class ControlInputProcessor {
 		final LaneRenderer lanerender = player.getLanerender();
 		final BMSPlayerInputProcessor input = player.main.getInputProcessor();
 		long now = System.currentTimeMillis();
-		boolean controlsActive = enableControl && isLaneControlActive(player.getState());
+		boolean controlsActive = enableControl && !player.restoresReplayLaneSettings() && isLaneControlActive(player.getState());
 		boolean toggleHidden = selectDoublePress.update(input.isSelectPressed(),
 				controlsActive && !input.startPressed(), now);
 		// 各種コントロール入力判定

@@ -33,6 +33,8 @@ public class BMControllerInputProcessor extends BMSPlayerInputDevice {
 	 * スタートキーアサイン
 	 */
 	private int start = BMKeys.BUTTON_9;
+    private int[][] bindings = new int[0][];
+    private boolean[] logicalHeld = new boolean[0];
 	/**
 	 * セレクトキーアサイン
 	 */
@@ -87,10 +89,14 @@ public class BMControllerInputProcessor extends BMSPlayerInputDevice {
 		this.setConfig(controllerConfig);
 	}
 
-	public void setConfig(ControllerConfig controllerConfig) {
+	public void setConfig(ControllerConfig controllerConfig) { setConfig(controllerConfig, false); }
+    public void setConfig(ControllerConfig controllerConfig, boolean multi) {
+        if (bindings.length > 0) bmsPlayerInputProcessor.releaseSource(this);
 		this.buttons = controllerConfig.getKeyAssign().clone();
 		this.start = controllerConfig.getStart();
 		this.select = controllerConfig.getSelect();
+        bindings = MultiInputBindings.resolve(buttons, start, select, controllerConfig.getAdditionalBindings(), multi);
+        logicalHeld = new boolean[bindings.length];
 		this.duration = controllerConfig.getDuration();
 		this.jkoc = controllerConfig.getJKOC();
 
@@ -132,6 +138,7 @@ public class BMControllerInputProcessor extends BMSPlayerInputDevice {
 		Arrays.fill(buttonchanged, false);
 		Arrays.fill(buttontime, Long.MIN_VALUE);
 		lastPressedButton = -1;
+        // Keep held evidence across the READY -> PLAY timestamp reset.
 	}
 
 	public void poll(final long microtime) {
@@ -171,26 +178,20 @@ public class BMControllerInputProcessor extends BMSPlayerInputDevice {
 			}
 		}
 
-		for (int i = 0; i < buttons.length; i++) {
-			final int button = buttons[i];
-			if (button >= 0 && button < BMKeys.MAXID && buttonchanged[button]) {
-				this.bmsPlayerInputProcessor.keyChanged(this, microtime, i, buttonstate[button]);
-				buttonchanged[button] = false;
-			}
-		}
-
-		if (start >= 0 && start < BMKeys.MAXID && buttonchanged[start]) {
-			this.bmsPlayerInputProcessor.startChanged(buttonstate[start]);
-			buttonchanged[start] = false;
-		}
-        if (select >= 0 && select < BMKeys.MAXID && buttonchanged[select]) {
-            this.bmsPlayerInputProcessor.setSelectPressed(buttonstate[select]);
-            buttonchanged[select] = false;
+        for (int index = 0; index < bindings.length; index++) {
+            boolean held = MultiInputBindings.pressed(bindings[index], buttonstate);
+            if (held == logicalHeld[index]) continue;
+            logicalHeld[index] = held;
+            if (index < buttons.length) bmsPlayerInputProcessor.keyChanged(this, microtime, index, held);
+            else if (index == buttons.length) bmsPlayerInputProcessor.startChanged(this, held);
+            else bmsPlayerInputProcessor.selectChanged(this, held);
         }
 
         boolean isAnalog = !jkoc && analogScratchAlgorithm != null;
         for (int i = 0; i < buttons.length; i++) {
-            final int button = buttons[i];
+            // Preserve the primary axis; an alias axis is used only when no primary exists.
+            final int button = buttons[i] >= 0 ? buttons[i]
+                    : (bindings[i].length > 0 ? bindings[i][0] : -1);
             if (button < 0 || button >= BMKeys.MAXID) continue;
             if (isAnalog && button >= BMKeys.AXIS1_PLUS) {
                 this.bmsPlayerInputProcessor.setAnalogState(i, true, getAnalogValue(button));

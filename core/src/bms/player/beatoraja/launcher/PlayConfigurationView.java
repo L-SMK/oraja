@@ -514,6 +514,9 @@ public class PlayConfigurationView implements Initializable {
 	public CheckBox clipboardScreenshot;
 	@FXML
 	private ComboBox<ScreenShotFormat> screenshotFormat;
+    @FXML private CheckBox screenshotSound;
+    @FXML private Slider screenshotSoundVolume;
+    @FXML private CheckBox replayLaneSettings;
 
 	static void initComboBox(ComboBox<Integer> combo, final String[] values) {
 		combo.setCellFactory((param) -> new OptionListCell(values));
@@ -737,6 +740,7 @@ public class PlayConfigurationView implements Initializable {
 		discordController.init(this);
 		obsController.init(this);
 		screenshotFormat.getItems().setAll(ScreenShotFormat.values());
+        screenshotSoundVolume.disableProperty().bind(screenshotSound.selectedProperty().not());
 		initializeModMenuSettings();
 		initializeConfigurationShell(arg1);
 
@@ -1506,6 +1510,12 @@ public class PlayConfigurationView implements Initializable {
 						sidebarSettingRow(otherTab, "clipboardScreenshot", "スクリーンショットをクリップボードへコピー", "Copy screenshots to clipboard",
 								"スクリーンショット保存時、画像データをOSのクリップボードにもコピーします。",
 								"Copy image data to the OS clipboard whenever a screenshot is saved."),
+                        sidebarSettingRow(otherTab, "screenshotSound", "スクショ保存音", "Screenshot sound",
+                                "保存に成功したときだけ通知音を鳴らします。初期OFF。", "Play a sound only after saving successfully. Off by default."),
+                        sidebarSettingRow(otherTab, "screenshotSoundVolume", "スクショ保存音量", "Screenshot sound volume",
+                                "システム音量に対する通知音の割合です。", "Notification level relative to system volume."),
+                        sidebarSettingRow(otherTab, "replayLaneSettings", "リプレイの表示設定を再現", "Restore replay lane settings",
+                                "記録されたHS・カバー操作を再現します。普段の設定には書き戻しません。", "Replay recorded speed and cover settings without changing your saved settings."),
 						sidebarSettingRow(otherTab, "screenshotFormat", "スクリーンショット保存形式", "Screenshot format",
 								"保存形式をPNGまたはJPGから選びます。Webhook添付の形式も一致します。",
 								"Choose PNG or JPG; webhook attachments use the same format."),
@@ -2898,6 +2908,9 @@ public class PlayConfigurationView implements Initializable {
 
         usecim.setSelected(config.isCacheSkinImage());
         clipboardScreenshot.setSelected(config.isSetClipboardWhenScreenshot());
+        screenshotSound.setSelected(config.isScreenshotSound());
+        screenshotSoundVolume.setValue(config.getScreenshotSoundVolume());
+        replayLaneSettings.setSelected(config.isReplayLaneSettings());
 		screenshotFormat.setValue(config.getScreenshotFormat());
 
 		enableIpfs.setSelected(config.isEnableIpfs());
@@ -3150,6 +3163,9 @@ public class PlayConfigurationView implements Initializable {
 		config.setOverrideDownloadURL(overrideDownloadURL.getText());
 
 		config.setClipboardWhenScreenshot(clipboardScreenshot.isSelected());
+        config.setScreenshotSound(screenshotSound.isSelected());
+        config.setScreenshotSoundVolume((float)screenshotSoundVolume.getValue());
+        config.setReplayLaneSettings(replayLaneSettings.isSelected());
 		config.setScreenshotFormat(screenshotFormat.getValue());
 
 		commitPlayer();

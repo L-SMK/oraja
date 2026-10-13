@@ -140,6 +140,7 @@ public final class BMSIRKeyProfileStore {
             PlayModeConfig incoming = copy(entry.config);
             if (scope == Scope.KEYS_ONLY) {
                 PlayModeConfig target = copy(player.getPlayConfig(entry.mode));
+                target.setMultiInputEnabled(incoming.isMultiInputEnabled());
                 target.setKeyboardConfig(incoming.getKeyboardConfig());
                 target.setController(incoming.getController());
                 target.setMidiConfig(incoming.getMidiConfig());
