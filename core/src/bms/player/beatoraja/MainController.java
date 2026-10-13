@@ -619,6 +619,7 @@ public class MainController {
 			}
 			break;
 		case DECIDE:
+            resource.setOrgGaugeOption(player.getGauge());
 			if (config.isSkipDecideScreen()) {
 				judgeTimingRestore.begin(player);
 				newState = createBMSPlayerState();

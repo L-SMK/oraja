@@ -79,6 +79,7 @@ public class SQLiteSongDatabaseAccessor extends SQLiteDatabaseAccessor implement
 				new Table("song",
 						new Column("md5", "TEXT", 1, 0),
 						new Column("sha256", "TEXT", 1, 0),
+                        new Column("parsercompatibility", "INTEGER"),
 						new Column("title", "TEXT"),
 						new Column("subtitle", "TEXT"),
 						new Column("genre", "TEXT"),
@@ -395,7 +396,16 @@ public class SQLiteSongDatabaseAccessor extends SQLiteDatabaseAccessor implement
 				}
 			}
 		}
-		SongDatabaseUpdater updater = new SongDatabaseUpdater(updateAll, bmsroot, info);
+        // A normal update must refresh old parser metadata even when file mtimes are unchanged.
+        boolean parserRefresh = false;
+        try (Connection connection = qr.getDataSource().getConnection();
+             Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery("SELECT 1 FROM song WHERE parsercompatibility IS NULL OR parsercompatibility < 2 LIMIT 1")) {
+            parserRefresh = result.next();
+        } catch (SQLException failure) {
+            logger.warn("Parser metadata revision could not be checked: {}", failure.getMessage());
+        }
+		SongDatabaseUpdater updater = new SongDatabaseUpdater(updateAll || parserRefresh, bmsroot, info);
 		updater.updateSongDatas(path == null ? Stream.of(bmsroot).map(p -> Paths.get(p)) : Stream.of(Paths.get(path)), listener);
 	}
 	

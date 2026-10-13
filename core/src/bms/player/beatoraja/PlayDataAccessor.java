@@ -197,7 +197,7 @@ public final class PlayDataAccessor {
 
 	public ScoreData readScoreData(SongData song, int lnmode) {
 		return BMSIRLongNoteMode.compatibleScore(
-				scoreDatabase(song, false).getScoreData(song.getSha256(), songScoreMode(song, lnmode)),
+				scoreDatabase(song, false).getScoreData(BMSIRParserCompatibility.storageHash(song, song.getSha256()), songScoreMode(song, lnmode)),
 				separatesScore(song));
 	}
 
@@ -306,7 +306,19 @@ public final class PlayDataAccessor {
 		for (boolean separate : new boolean[]{false, true}) {
 			SongData[] group = Arrays.stream(songs).filter(s -> separatesScore(s) == separate).toArray(SongData[]::new);
 			if (group.length == 0) continue;
-			(separate ? forcedScoredb : scoredb).getScoreDatas(collector, group, lnmode, separate, separate);
+            SongData[] corrected = Arrays.stream(group).filter(BMSIRParserCompatibility::affected).toArray(SongData[]::new);
+            SongData[] ordinary = Arrays.stream(group).filter(s -> !BMSIRParserCompatibility.affected(s)).toArray(SongData[]::new);
+            ScoreDatabaseAccessor database = separate ? forcedScoredb : scoredb;
+            if (ordinary.length > 0) database.getScoreDatas(collector, ordinary, lnmode, separate, separate);
+            for (boolean modeDependent : new boolean[]{false, true}) {
+                SongData[] subset = Arrays.stream(corrected).filter(song ->
+                        (separate ? song.hasAnyLongNote() : song.hasUndefinedLongNote()) == modeDependent)
+                        .toArray(SongData[]::new);
+                if (subset.length > 0) database.getScoreDatasByHash(
+                        (song, score) -> collector.collect(song, BMSIRLongNoteMode.compatibleScore(score, separate)),
+                        subset, modeDependent ? lnmode : 0,
+                        song -> BMSIRParserCompatibility.storageHash(song, song.getSha256()), false, separate);
+            }
 		}
 	}
 
@@ -333,6 +345,7 @@ public final class PlayDataAccessor {
 		if (newscore == null) {
 			return;
 		}
+        if (BMSIRParserCompatibility.affected(model)) newscore.setSha256(hash);
 		boolean changedLnMode = BMSIRLongNoteMode.separatesScore(model);
 		ScoreData score = BMSIRLongNoteMode.compatibleScore(
 				targetDatabase.getScoreData(hash, model.containsUndefinedLongNote() ? lnmode : 0), changedLnMode);
@@ -473,7 +486,7 @@ public final class PlayDataAccessor {
 
 	private static String scoreHash(BMSModel model) {
 		String special = model.getValues().get(BMSIRManiacPlayContext.MODEL_STORAGE_HASH);
-		return special == null || special.isBlank() ? model.getSHA256() : special;
+		return BMSIRParserCompatibility.storageHash(model, special == null || special.isBlank() ? model.getSHA256() : special);
 	}
 
 	private void updatePlayerData(ScoreData score, long time, ScoreDatabaseAccessor database) {
@@ -539,7 +552,7 @@ public final class PlayDataAccessor {
 		String[] hash = new String[models.length];
 		boolean ln = false;
 		for (int i = 0; i < models.length; i++) {
-			hash[i] = models[i].getSHA256();
+			hash[i] = BMSIRParserCompatibility.storageHash(models[i], models[i].getSHA256());
 			ln |= models[i].containsUndefinedLongNote();
 		}
 		boolean separate = Arrays.stream(models).anyMatch(BMSIRLongNoteMode::separatesScore);
@@ -551,7 +564,7 @@ public final class PlayDataAccessor {
 			CourseData.CourseDataConstraint[] constraint) {
 		boolean separate = Arrays.stream(songs).anyMatch(this::separatesScore);
 		boolean ln = separate || Arrays.stream(songs).anyMatch(BMSIRLongNoteMode::authoredUndefined);
-		String hash = String.join("", Arrays.stream(songs).map(SongData::getSha256).toArray(String[]::new));
+		String hash = String.join("", Arrays.stream(songs).map(s -> BMSIRParserCompatibility.storageHash(s, s.getSha256())).toArray(String[]::new));
 		return BMSIRLongNoteMode.compatibleScore((separate ? forcedScoredb : scoredb).getScoreData(
 				hash, courseScoreMode(ln, lnmode, option, constraint)), separate);
 	}
@@ -574,13 +587,14 @@ public final class PlayDataAccessor {
 		int totalnotes = 0;
 		boolean ln = false;
 		for (BMSModel model : models) {
-			hash += model.getSHA256();
+			hash += BMSIRParserCompatibility.storageHash(model, model.getSHA256());
 			totalnotes += NantokaManiaRules.totalNotes(model);
 			ln |= model.containsUndefinedLongNote();
 		}
 		if (newscore == null) {
 			return;
 		}
+        if (Arrays.stream(models).anyMatch(BMSIRParserCompatibility::affected)) newscore.setSha256(hash);
 		int hispeed = 0;
 		int judge = 0;
 		int gauge = 0;
@@ -722,7 +736,7 @@ public final class PlayDataAccessor {
 	}
 
 	public void deleteScoreData(SongData song, int lnmode) {
-		scoreDatabase(song, false).deleteScoreData(song.getSha256(), songScoreMode(song, lnmode));
+		scoreDatabase(song, false).deleteScoreData(BMSIRParserCompatibility.storageHash(song, song.getSha256()), songScoreMode(song, lnmode));
 	}
 
 	public void deleteScoreData(
@@ -733,7 +747,7 @@ public final class PlayDataAccessor {
 		StringBuilder hash = new StringBuilder();
 		boolean undefinedLongNote = false;
 		for (SongData song : songs) {
-			hash.append(song.getSha256());
+			hash.append(BMSIRParserCompatibility.storageHash(song, song.getSha256()));
 			undefinedLongNote |= separatesScore(song) || BMSIRLongNoteMode.authoredUndefined(song);
 		}
 		for (int option = 0; option < 3; option++) {
@@ -784,7 +798,8 @@ public final class PlayDataAccessor {
 				: BMSIRLongNoteMode.authoredUndefined(song.getBMSModel());
 		return ((forceLn() || BMSIRLongNoteMode.isApplied(song.getBMSModel()))
 				&& existsReplayData(BMSIRLongNoteMode.replayHash(song, hash), song.hasAnyLongNote(), lnmode, index))
-				|| existsReplayData(hash, authoredUndefined, lnmode, index);
+				|| existsReplayData(BMSIRParserCompatibility.storageHash(song, hash), authoredUndefined, lnmode, index)
+                || existsReplayData(hash, authoredUndefined, lnmode, index);
 	}
 
 	public boolean existsReplayData(String hash, boolean ln, int lnmode, int index) {
@@ -801,6 +816,8 @@ public final class PlayDataAccessor {
 			ln |= model.containsUndefinedLongNote();
 		}
 		return existsReplayData(hash, ln, lnmode, index, constraint)
+                || existsReplayData(Arrays.stream(models).map(model -> BMSIRLongNoteMode.legacyReplayHash(model, model.getSHA256())).toArray(String[]::new),
+                        ln, lnmode, index, constraint)
 				|| existsReplayData(Arrays.stream(models).map(BMSModel::getSHA256).toArray(String[]::new),
 						Arrays.stream(models).anyMatch(BMSIRLongNoteMode::authoredUndefined),
 						lnmode, index, constraint);
@@ -884,6 +901,8 @@ public final class PlayDataAccessor {
 		if (existsReplayData(hashes, ln, lnmode, index, constraint)) {
 			return readReplayData(hashes, ln, lnmode, index, constraint);
 		}
+        String[] legacy = Arrays.stream(models).map(model -> BMSIRLongNoteMode.legacyReplayHash(model, model.getSHA256())).toArray(String[]::new);
+        if (existsReplayData(legacy, ln, lnmode, index, constraint)) return readReplayData(legacy, ln, lnmode, index, constraint);
 		return readReplayData(Arrays.stream(models).map(BMSModel::getSHA256).toArray(String[]::new),
 				Arrays.stream(models).anyMatch(BMSIRLongNoteMode::authoredUndefined),
 				lnmode, index, constraint);
@@ -969,7 +988,7 @@ public final class PlayDataAccessor {
 	public void deleteReplayData(BMSModel model, int lnmode, int index) {
 		if (existsReplayData(model, lnmode, index)) {
 			try {
-				Files.deleteIfExists(Paths.get(replayReadPath(model, lnmode, index) + ".brd"));
+				Files.deleteIfExists(Paths.get((BMSIRParserCompatibility.affected(model) ? getReplayDataFilePath(model, lnmode, index) : replayReadPath(model, lnmode, index)) + ".brd"));
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -983,6 +1002,9 @@ public final class PlayDataAccessor {
 	private String replayReadPath(BMSModel model, int lnmode, int index) {
 		String current = getReplayDataFilePath(model, lnmode, index);
 		if (Files.exists(Paths.get(current + ".brd"))) return current;
+        String parserLegacy = getReplayDataFilePath(BMSIRLongNoteMode.legacyReplayHash(model, baseReplayHash(model)),
+                model.containsUndefinedLongNote(), lnmode, index);
+        if (Files.exists(Paths.get(parserLegacy + ".brd"))) return parserLegacy;
 		BMSIRManiacSettings selected = BMSIRManiacSettings.fromCanonicalOptions(
 				model.getValues().get(BMSIRManiacPlayContext.MODEL_OPTIONS));
 		if (selected == null && playerConfig != null) {
@@ -996,6 +1018,9 @@ public final class PlayDataAccessor {
 			String oldPath = getReplayDataFilePath(BMSIRLongNoteMode.replayHash(model, oldHash),
 					model.containsUndefinedLongNote(), lnmode, index);
 			if (Files.exists(Paths.get(oldPath + ".brd"))) return oldPath;
+            oldPath = getReplayDataFilePath(BMSIRLongNoteMode.legacyReplayHash(model, oldHash),
+                    model.containsUndefinedLongNote(), lnmode, index);
+            if (Files.exists(Paths.get(oldPath + ".brd"))) return oldPath;
 			oldPath = getReplayDataFilePath(oldHash, BMSIRLongNoteMode.authoredUndefined(model), lnmode, index);
 			if (Files.exists(Paths.get(oldPath + ".brd"))) return oldPath;
 		}

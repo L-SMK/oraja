@@ -38,6 +38,7 @@ public class BGAProcessor {
 
 	private PlayerConfig player;
 	private volatile float progress = 0;
+    private boolean bmsonLayer;
 
 	private MovieProcessor[] movies = new MovieProcessor[0]; 
 	
@@ -125,6 +126,7 @@ public class BGAProcessor {
 	}
 
 	public synchronized void setModel(BMSModel model, SongResource chartResource) {
+        bmsonLayer = model != null && "1".equals(model.getValues().get(bms.model.BMSONDecoder.FORMAT_MARKER));
 		progress = 0;
 
         if (async != null) {
@@ -263,6 +265,7 @@ public class BGAProcessor {
 	 * so no file, decoder, or background loader is touched.
 	 */
 	public synchronized void setSkinPreviewModel(BMSModel model) {
+        bmsonLayer = model != null && "1".equals(model.getValues().get(bms.model.BMSONDecoder.FORMAT_MARKER));
 		progress = 0;
         if (async != null) {
             async.reset();
@@ -494,7 +497,7 @@ public class BGAProcessor {
 					sprite.setType(async != null ? SkinObjectRenderer.TYPE_LINEAR : SkinObjectRenderer.TYPE_FFMPEG);
 					drawBGAFixRatio(dst, sprite, r, playinglayertex);
 				} else {
-					sprite.setType(SkinObjectRenderer.TYPE_LAYER);
+					sprite.setType(bmsonLayer ? SkinObjectRenderer.TYPE_LINEAR : SkinObjectRenderer.TYPE_LAYER);
 					drawBGAFixRatio(dst, sprite, r, playinglayertex);
 				}
 			}

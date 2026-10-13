@@ -66,6 +66,9 @@ public class IRConfigurationView implements Initializable {
 	
     public void update(PlayerConfig player) {
     	this.player = player;
+        currentir = null;
+        irmap.clear();
+        irname.getItems().setAll(availableAndStoredNames(IRConnectionManager.getAllAvailableIRConnectionName(), player.getIrconfig()));
     	
     	for(IRConfig ir : player.getIrconfig()) {
     		irmap.put(ir.getIrname(), ir);
@@ -89,24 +92,26 @@ public class IRConfigurationView implements Initializable {
     public void commit() {
 		updateIRConnection();
 		
-		List<IRConfig> irlist = new ArrayList<IRConfig>();
-		
-		for(String s : irname.getItems()) {
-			IRConfig ir = irmap.get(s);
-			if(ir != null && ir.getUserid().length() > 0) {
-				if(s.equals(primary) ) {
-					irlist.add(0, ir);
-				} else {
-					irlist.add(ir);
-				}
-			}
-		}
-		
-		player.setIrconfig(irlist.toArray(new IRConfig[irlist.size()]));
+        player.setIrconfig(configurationsToSave(irname.getItems(), irmap, primary));
 		player.setBmsirArenaEnabled(bmsirArenaEnabled.isSelected());
 		player.setBmsirArenaServer(bmsirArenaServer.getText());
     }
     
+    static List<String> availableAndStoredNames(String[] available, IRConfig[] saved) {
+        java.util.LinkedHashSet<String> names = new java.util.LinkedHashSet<>(java.util.Arrays.asList(available));
+        for (IRConfig config : saved) if (config != null && config.getIrname() != null && !config.getIrname().isBlank()) names.add(config.getIrname());
+        return new ArrayList<>(names);
+    }
+    static IRConfig[] configurationsToSave(List<String> names, Map<String, IRConfig> configs, String primary) {
+        List<IRConfig> result = new ArrayList<>();
+        for (String name : names) {
+            IRConfig config = configs.get(name);
+            if (config == null || !config.validate()) continue;
+            if (name.equals(primary)) result.add(0, config); else result.add(config);
+        }
+        return result.toArray(IRConfig[]::new);
+    }
+
 	@FXML
 	public void setPrimary() {
 		primary = irname.getValue();
@@ -123,7 +128,12 @@ public class IRConfigurationView implements Initializable {
 			currentir.setImportrival(importrival.isSelected());
 		}
 		
+        if (irname.getValue() == null) {
+            currentir = null;
+            return;
+        }
     	String homeurl = IRConnectionManager.getHomeURL(irname.getValue());
+        irhome.setDisable(homeurl == null || homeurl.isBlank());
 		irhome.setText(homeurl);
 		irhome.setOnAction((event) -> {
             Desktop desktop = Desktop.getDesktop();

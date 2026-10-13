@@ -273,7 +273,7 @@ public class RankingData {
 
 	public static String cacheIdentity(Object target, IRRankingContext context) {
 		if (target instanceof SongData song) {
-			String sha = song.getSha256();
+			String sha = bms.player.beatoraja.BMSIRParserCompatibility.storageHash(song, song.getSha256());
 			if (sha == null || sha.length() != 64) return "";
 			return "song:" + sha.toLowerCase() + ":" + (context.forceLn()
 					&& BMSIRLongNoteMode.separatesScore(song) ? "forced-ln" : "ordinary");
@@ -283,7 +283,7 @@ public class RankingData {
 			StringBuilder identity = new StringBuilder("course:v2:");
 			for (SongData song : course.getSong()) {
 				if (song == null || song.getSha256() == null || song.getSha256().length() != 64) return "";
-				identity.append(song.getSha256().toLowerCase()).append(':');
+				identity.append(bms.player.beatoraja.BMSIRParserCompatibility.storageHash(song, song.getSha256()).toLowerCase()).append(':');
 			}
 			if (course.getConstraint() != null) {
 				Arrays.stream(course.getConstraint()).forEach(constraint -> identity.append(constraint.name).append(':'));

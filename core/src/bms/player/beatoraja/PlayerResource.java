@@ -246,14 +246,30 @@ public final class PlayerResource {
 		return loadBMSModel(resource, force ? 0 : lnmode, selectedRandom, force);
 	}
 
+    /** Rebind legacy geometry without modifying the selector's current SongData. */
+    public void installRecordedReplayModel(BMSModel recorded) {
+        preferStoredBackbmp(recorded, songdata);
+        model = recorded;
+        songdata = new SongData(recorded, false);
+        if (bmsresource != null) bmsresource.rebindReplayModel(recorded, chartResource, config, mode);
+        if (config.getAudioConfig().isNormalizeVolume() && loudnessAnalyzer != null && loudnessAnalyzer.isAvailable()) {
+            analysisTask = loudnessAnalyzer.analyzeAsync(recorded);
+        }
+    }
+
 	public BMSModel loadBMSModelForReplay(ReplayData replay) {
 		return loadBMSModel(chartResource != null ? chartResource
 				: SongResources.fromPath(Path.of(model.getPath())),
-				replay.mode, replay.rand, replay.bmsirForcedLongNotes);
+				replay.mode, replay.rand, replay.bmsirForcedLongNotes, replay.bmsirParserRevision < 2);
 	}
 
 	private BMSModel loadBMSModel(SongResource resource, int lnmode, int[] selectedRandom,
 			boolean forceLongNotes) {
+        return loadBMSModel(resource, lnmode, selectedRandom, forceLongNotes, false);
+    }
+
+    private BMSModel loadBMSModel(SongResource resource, int lnmode, int[] selectedRandom,
+                                boolean forceLongNotes, boolean legacyParser) {
 		String lowerName = resource.name().toLowerCase(java.util.Locale.ROOT);
 		ChartDecoder decoder;
 		BMSModel loaded;
@@ -261,6 +277,7 @@ public final class PlayerResource {
 			if (lowerName.endsWith(".bms") || lowerName.endsWith(".bme")
 					|| lowerName.endsWith(".bml") || lowerName.endsWith(".pms")) {
 				decoder = new BMSDecoder(lnmode);
+                ((BMSDecoder)decoder).setLegacyCompatibility(legacyParser);
 				try (java.io.InputStream input = resource.openStream()) {
 					loaded = ((BMSDecoder) decoder).decode(input.readAllBytes(),
 							lowerName.endsWith(".pms"), selectedRandom);

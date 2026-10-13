@@ -93,12 +93,16 @@ public final class BMSIRLongNoteMode {
     }
 
     public static String replayHash(BMSModel model, String baseHash) {
+        return legacyReplayHash(model, BMSIRParserCompatibility.storageHash(model, baseHash));
+    }
+    public static String legacyReplayHash(BMSModel model, String baseHash) {
         return model.getValues().containsKey(AUTHORED_FEATURES) && changesAuthoredMode(model)
                 ? forcedReplayHash(baseHash) : baseHash;
     }
 
     public static String replayHash(SongData song, String baseHash) {
-        return changesAuthoredMode(song) ? forcedReplayHash(baseHash) : baseHash;
+        String storage = BMSIRParserCompatibility.storageHash(song, baseHash);
+        return changesAuthoredMode(song) ? forcedReplayHash(storage) : storage;
     }
 
     private static String forcedReplayHash(String baseHash) {
