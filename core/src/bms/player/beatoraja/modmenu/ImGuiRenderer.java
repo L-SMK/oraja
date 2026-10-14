@@ -59,6 +59,7 @@ public class ImGuiRenderer {
     private static ImBoolean SHOW_PERFORMANCE_MONITOR = new ImBoolean(false);
     private static ImBoolean SHOW_SKIN_MENU = new ImBoolean(false);
     private static ImBoolean SHOW_PLAY_SETTINGS = new ImBoolean(false);
+    private static ImBoolean SHOW_HISPEED_SETTINGS = new ImBoolean(false);
     private static ImBoolean SHOW_SOUND_SETTINGS = new ImBoolean(false);
     private static ImBoolean SHOW_DISPLAY_SETTINGS = new ImBoolean(false);
     private static ImBoolean SHOW_MY_TABLE_EDITOR = new ImBoolean(false);
@@ -172,6 +173,7 @@ public class ImGuiRenderer {
                 SHOW_PERFORMANCE_MONITOR.get()) {
                 PerformanceMonitor.reloadEventTree();
             }
+            if (show(ModMenuItem.HISPEED_SETTINGS)) ImGui.checkbox(t("ハイスピード", "Show HI-SPEED Window"), SHOW_HISPEED_SETTINGS);
             if (show(ModMenuItem.PLAY_SETTINGS)) ImGui.checkbox(t("プレイ設定", "Show Play Settings Window"), SHOW_PLAY_SETTINGS);
             if (show(ModMenuItem.SOUND_SETTINGS)) ImGui.checkbox(t("音", "Show Sound Window"), SHOW_SOUND_SETTINGS);
             if (show(ModMenuItem.DISPLAY_SETTINGS)) ImGui.checkbox(t("表示", "Show Display Window"), SHOW_DISPLAY_SETTINGS);
@@ -218,6 +220,9 @@ public class ImGuiRenderer {
             }
             if (SHOW_PLAY_SETTINGS.get()) {
                 MiscSettingMenu.showPlaySettings(SHOW_PLAY_SETTINGS);
+            }
+            if (SHOW_HISPEED_SETTINGS.get()) {
+                MiscSettingMenu.showHispeedSettings(SHOW_HISPEED_SETTINGS);
             }
             if (SHOW_SOUND_SETTINGS.get()) {
                 MiscSettingMenu.showSoundSettings(SHOW_SOUND_SETTINGS);
@@ -537,6 +542,7 @@ public class ImGuiRenderer {
             case DOWNLOAD_TASKS -> SHOW_DOWNLOAD_MENU.set(false);
             case PERFORMANCE_MONITOR -> SHOW_PERFORMANCE_MONITOR.set(false);
             case PLAY_SETTINGS -> SHOW_PLAY_SETTINGS.set(false);
+            case HISPEED_SETTINGS -> SHOW_HISPEED_SETTINGS.set(false);
             case SOUND_SETTINGS -> SHOW_SOUND_SETTINGS.set(false);
             case DISPLAY_SETTINGS -> SHOW_DISPLAY_SETTINGS.set(false);
             case MY_TABLE_EDITOR -> SHOW_MY_TABLE_EDITOR.set(false);

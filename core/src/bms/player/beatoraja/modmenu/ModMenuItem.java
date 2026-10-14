@@ -11,6 +11,7 @@ public enum ModMenuItem {
     DOWNLOAD_TASKS("download_tasks", "ダウンロード状況", "Download Tasks"),
     PERFORMANCE_MONITOR("performance_monitor", "パフォーマンスモニター", "Performance Monitor"),
     PLAY_SETTINGS("play_settings", "プレイ設定", "Play Settings"),
+    HISPEED_SETTINGS("hispeed_settings", "ハイスピード", "HI-SPEED"),
     SOUND_SETTINGS("sound_settings", "音", "Sound"),
     DISPLAY_SETTINGS("display_settings", "表示", "Display"),
     MY_TABLE_EDITOR("my_table_editor", "難易度表編集", "Table Editor"),
