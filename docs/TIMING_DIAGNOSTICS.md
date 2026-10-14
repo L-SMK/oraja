@@ -45,6 +45,14 @@ also reuse immutable strings. Lua scripts can still replace `type` themselves.
 This reduces allocation pressure; it does not establish a GC pause deadline or
 prove that every BGA/frame stall is resolved.
 
+`main_state.text` also reuses unchanged immutable Lua strings through a fixed
+64-slot content cache, bypassed above 4096 characters. The source getter still
+runs on every call. Lua string properties always invoke their callback, but can
+reuse the Java decoding of an unchanged exact LuaString instance (up to 4096
+characters). Other Lua values retain their dynamic `tojstring()` behavior. These
+caches neither increase the JVM heap setting nor alter GC selection or the
+number of retained skin images.
+
 All timing distributions contain `count`, `average_us`, `p50_us`, `p95_us`,
 `p99_us`, `max_us`, and `max_at`. `max_at` is the UTC instant at which the
 period's maximum was observed. Percentiles use fixed upper-bound buckets, so

@@ -359,10 +359,11 @@ public class MainStateAccessor {
 	 * NOTE: 呼び出しの度にStringPropertyを生成しており効率が悪いため非推奨
 	 */
 	private class text extends OneArgFunction {
+		private final SkinLuaTextCache values = new SkinLuaTextCache();
 		@Override
 		public LuaValue call(LuaValue luaValue) {
 			StringProperty prop = StringPropertyFactory.getStringProperty(luaValue.toint());
-			return LuaString.valueOf(prop.get(state));
+			return values.valueOf(prop.get(state));
 		}
 	}
 
