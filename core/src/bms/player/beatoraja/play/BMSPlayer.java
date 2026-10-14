@@ -1531,6 +1531,10 @@ public class BMSPlayer extends MainState {
 		return lanerender;
 	}
 
+	public void resetLaneControlInput() {
+		if (control != null) control.resetAfterHispeedModeChange();
+	}
+
 	public LaneProperty getLaneProperty() {
 		return laneProperty;
 	}
@@ -1561,14 +1565,17 @@ public class BMSPlayer extends MainState {
 	) {
 		target.setBmsirFloatingHispeed(live.getBmsirFloatingHispeed());
 		target.setBmsirFloatingGreenFrames(live.getBmsirFloatingGreenFrames());
+		target.setBmsirHispeedMode(live.getBmsirHispeedMode());
+		target.setBmsirLr2Hispeed(live.getBmsirLr2Hispeed());
+		target.setFixhispeed(live.getFixhispeed());
 		if (bmsirLr2HispeedFixEnabled) {
-			target.setHispeed(live.getHispeed());
+			if (live.getBmsirLr2Hispeed() == null) target.setHispeed(live.getHispeed());
 			target.setDuration(live.getDuration());
 			target.setBmsirBaseScrollSpeed(live.getBmsirBaseScrollSpeed());
 			target.setBmsirHispeedReferenceBpm(
 					live.getBmsirHispeedReferenceBpm()
 			);
-		} else if (target.getFixhispeed() != PlayConfig.FIX_HISPEED_OFF) {
+		} else if (live.getFixhispeed() != PlayConfig.FIX_HISPEED_OFF) {
 			target.setDuration(live.getDuration());
 		} else {
 			target.setHispeed(live.getHispeed());

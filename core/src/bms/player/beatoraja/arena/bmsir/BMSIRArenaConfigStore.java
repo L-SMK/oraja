@@ -40,14 +40,24 @@ public final class BMSIRArenaConfigStore {
         private float multiplier = 2f;
         private float greenFrames = 30f;
         private boolean coverVisible = true;
+        private String speedMode;
+        private Float lr2Hispeed;
+        private Float hispeed;
+        private Integer duration;
+        private Integer fixhispeed;
 
-        static FloatingSettings from(int mode, PlayConfig pc) {
+        static FloatingSettings from(int mode, PlayConfig pc, boolean legacyLr2) {
             FloatingSettings settings = new FloatingSettings();
             settings.mode = mode;
             settings.enabled = pc.isBmsirFloatingHispeedEnabled();
             settings.multiplier = pc.getBmsirFloatingHispeed();
             settings.greenFrames = pc.getBmsirFloatingGreenFrames();
             settings.coverVisible = pc.isBmsirFloatingCoverVisible();
+            settings.speedMode = pc.resolveBmsirHispeedMode(legacyLr2);
+            settings.lr2Hispeed = pc.getEffectiveLr2Hispeed();
+            settings.hispeed = pc.getHispeed();
+            settings.duration = pc.getDuration();
+            settings.fixhispeed = pc.getFixhispeed();
             return settings;
         }
 
@@ -58,10 +68,16 @@ public final class BMSIRArenaConfigStore {
         }
 
         void applyTo(PlayConfig pc) {
+            String previousMode = pc.getBmsirHispeedMode();
             pc.setBmsirFloatingHispeedEnabled(enabled);
             pc.setBmsirFloatingHispeed(multiplier);
             pc.setBmsirFloatingGreenFrames(greenFrames);
             pc.setBmsirFloatingCoverVisible(coverVisible);
+            pc.setBmsirHispeedMode(speedMode != null ? speedMode : previousMode);
+            if (lr2Hispeed != null) pc.setBmsirLr2Hispeed(lr2Hispeed);
+            if (hispeed != null) pc.setHispeed(hispeed);
+            if (duration != null) pc.setDuration(duration);
+            if (fixhispeed != null) pc.setFixhispeed(fixhispeed);
             pc.validate();
         }
     }
@@ -168,7 +184,7 @@ public final class BMSIRArenaConfigStore {
 
     /** Explicit allow-list. Do not replace with PlayerConfig serialization. */
     static final class Settings {
-        private int schemaVersion = 23;
+        private int schemaVersion = 24;
         private Boolean oneBassEnabled;
         private Boolean startHerePreviewEnabled;
         private Boolean danLocalSyncEnabled;
@@ -217,6 +233,7 @@ public final class BMSIRArenaConfigStore {
         private int[] hispeedReferenceBpms;
         private float[] hispeedMargins;
         private FloatingSettings[] floatingHispeeds;
+        private Boolean bgaDisplayEnabled;
         private Boolean judgeRankSortEnabled;
         private Boolean judgeRankSortSkinNoticeEnabled;
         private String[] numpadActions;
@@ -300,12 +317,13 @@ public final class BMSIRArenaConfigStore {
             settings.hispeedReferenceBpms =
                     player.getBmsirHispeedReferenceBpms();
             settings.hispeedMargins = player.getBmsirHispeedMargins();
+            settings.bgaDisplayEnabled = player.isBmsirBgaDisplayEnabled();
             Mode[] modes = {Mode.BEAT_5K, Mode.BEAT_7K, Mode.BEAT_10K, Mode.BEAT_14K,
                     Mode.POPN_9K, Mode.KEYBOARD_24K, Mode.KEYBOARD_24K_DOUBLE};
             settings.floatingHispeeds = new FloatingSettings[modes.length];
             for (int i = 0; i < modes.length; i++) {
                 settings.floatingHispeeds[i] = FloatingSettings.from(modes[i].id,
-                        player.getPlayConfig(modes[i]).getPlayconfig());
+                        player.getPlayConfig(modes[i]).getPlayconfig(), player.isBmsirLr2HispeedFixEnabled());
             }
             settings.judgeRankSortEnabled =
                     player.isBmsirJudgeRankSortEnabled();
@@ -440,6 +458,7 @@ public final class BMSIRArenaConfigStore {
             if (lr2HispeedFixEnabled != null) {
                 player.setBmsirLr2HispeedFixEnabled(lr2HispeedFixEnabled);
             }
+            if (bgaDisplayEnabled != null) player.setBmsirBgaDisplayEnabled(bgaDisplayEnabled);
             if (hispeedEditorMode != null) {
                 player.setBmsirHispeedEditorMode(hispeedEditorMode);
             }

@@ -67,6 +67,8 @@ public class MiscSettingMenu {
         ImGui.setNextWindowPos(windowWidth * 0.455f, windowHeight * 0.04f, ImGuiCond.FirstUseEver);
         if (ImGui.begin(t("プレイ設定", "Play Settings") + "###play-settings",
                 open, ImGuiWindowFlags.AlwaysAutoResize)) {
+            if (ImGui.beginTabBar("##play-settings-tabs")) {
+            if (ImGui.beginTabItem(t("プレイ", "Play"))) {
             // Below settings are depending on different play mode
             if (ImGui.combo(t("プレイモード", "Play Mode"), PLAY_MODE_VALUE, PLAY_MODE_OPTIONS)) {
                 changePlayMode(Mode.getMode(PLAY_MODE_OPTIONS[PLAY_MODE_VALUE.get()]));
@@ -113,16 +115,21 @@ public class MiscSettingMenu {
             }
 
             PlayerConfig player = main.getPlayerConfig();
-            if (ImGui.collapsingHeader(t("ハイスピ", "HI-SPEED") + "###play-settings-hispeed")) {
-                BMSIRArenaOverlay.renderHispeedSettings();
-                alsoInArena(t("Arenaオーバーレイの上部", "the Arena overlay header"));
-            }
             if (ImGui.collapsingHeader(t("キープロファイル", "Key Profiles") + "###play-settings-key-profiles")) {
                 BMSIRArenaOverlay.renderKeyProfiles(player);
                 alsoInArena(t("Arenaオーバーレイの「プロファイル」タブ", "the Arena overlay's Profiles tab"));
             }
             ImGui.separator();
             profileSwitcher();
+            ImGui.endTabItem();
+            }
+            if (ImGui.beginTabItem(t("ハイスピード", "HI-SPEED"))) {
+                BMSIRArenaOverlay.renderHispeedSettings();
+                alsoInArena(t("Arenaオーバーレイのハイスピードタブ", "the Arena overlay HI-SPEED tab"));
+                ImGui.endTabItem();
+            }
+            ImGui.endTabBar();
+            }
         }
         ImGui.end();
     }

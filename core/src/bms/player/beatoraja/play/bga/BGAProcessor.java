@@ -450,6 +450,7 @@ public class BGAProcessor {
 
 
 	public void drawBGA(SkinBGA dst, SkinObjectRenderer sprite, Rectangle r) {
+        boolean displayEnabled = player == null || player.isBmsirBgaDisplayEnabled();
         long started = async != null ? async.metrics.start() : 0;
         if (async != null && time >= 0) {
             async.viewport(Math.max(1, (int) r.width), Math.max(1, (int) r.height));
@@ -471,7 +472,7 @@ public class BGAProcessor {
 				Texture miss = getBGAData(time, index, true, 2);
 				if (miss != null) {
 					sprite.setType(SkinObjectRenderer.TYPE_LINEAR);
-					drawBGAFixRatio(dst, sprite, r, miss);
+					if (displayEnabled) drawBGAFixRatio(dst, sprite, r, miss);
 				}				
 			}
 		} else {
@@ -481,10 +482,10 @@ public class BGAProcessor {
 			if (playingbgatex != null) {
 				if (movies[playingbgaid] != null) {
 					sprite.setType(async != null ? SkinObjectRenderer.TYPE_LINEAR : SkinObjectRenderer.TYPE_FFMPEG);
-					drawBGAFixRatio(dst, sprite, r, playingbgatex);
+					if (displayEnabled) drawBGAFixRatio(dst, sprite, r, playingbgatex);
 				} else {
 					sprite.setType(SkinObjectRenderer.TYPE_LINEAR);
-					drawBGAFixRatio(dst, sprite, r, playingbgatex);
+					if (displayEnabled) drawBGAFixRatio(dst, sprite, r, playingbgatex);
 				}
 			} else {
 				sprite.draw(blanktex, r.x, r.y, r.width, r.height);
@@ -495,13 +496,17 @@ public class BGAProcessor {
 			if (playinglayertex != null) {
 				if (movies[playinglayerid] != null) {
 					sprite.setType(async != null ? SkinObjectRenderer.TYPE_LINEAR : SkinObjectRenderer.TYPE_FFMPEG);
-					drawBGAFixRatio(dst, sprite, r, playinglayertex);
+					if (displayEnabled) drawBGAFixRatio(dst, sprite, r, playinglayertex);
 				} else {
 					sprite.setType(bmsonLayer ? SkinObjectRenderer.TYPE_LINEAR : SkinObjectRenderer.TYPE_LAYER);
-					drawBGAFixRatio(dst, sprite, r, playinglayertex);
+					if (displayEnabled) drawBGAFixRatio(dst, sprite, r, playinglayertex);
 				}
 			}
 		}
+        if (!displayEnabled) {
+            sprite.setType(SkinObjectRenderer.TYPE_LINEAR);
+            sprite.draw(blanktex, r.x, r.y, r.width, r.height);
+        }
         } finally {
             if (async != null && time >= 0) {
                 if (time >= 0) preloadUpcoming();

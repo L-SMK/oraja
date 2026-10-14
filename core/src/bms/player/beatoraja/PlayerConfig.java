@@ -381,6 +381,9 @@ public final class PlayerConfig {
 	private boolean bmsirCoverHispeedAutoAdjustEnabled = false;
 	/** Override the legacy fixed-HI-SPEED calculation with the LR2-style base. */
 	private boolean bmsirLr2HispeedFixEnabled = false;
+	private boolean bmsirBgaDisplayEnabled = true;
+	public boolean isBmsirBgaDisplayEnabled() { return bmsirBgaDisplayEnabled; }
+	public void setBmsirBgaDisplayEnabled(boolean enabled) { bmsirBgaDisplayEnabled = enabled; }
 	/** 0 follows the current chart; other values pin the overlay editor mode. */
 	private int bmsirHispeedEditorMode = BMSIR_HISPEED_EDITOR_FOLLOW_CURRENT;
 	/** Keep the Arena-added JUDGE sorter in the normal Music Select cycle. */
