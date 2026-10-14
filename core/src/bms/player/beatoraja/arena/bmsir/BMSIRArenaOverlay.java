@@ -236,11 +236,7 @@ public final class BMSIRArenaOverlay {
         ImGui.separator();
         if (ImGui.beginChild("##bmsir-arena-scroll-content", 0, 0, false)
                 && ImGui.beginTabBar("##bmsir-arena-tabs")) {
-            if (ImGui.beginTabItem(t("ハイスピード", "HI-SPEED"))) {
-                renderSpeedBlock(false);
-                renderAlsoIn("プレイ設定のハイスピードタブ", "the HI-SPEED tab in Play Settings");
-                ImGui.endTabItem();
-            }
+            // Arena features first, then player settings; the table editor is its own F5 window.
             if (ImGui.beginTabItem(t("対戦", "Battle"))) {
                 renderQueueActions();
                 ImGui.separator();
@@ -251,16 +247,13 @@ public final class BMSIRArenaOverlay {
                 renderRoomControls(config);
                 ImGui.endTabItem();
             }
-            if (ImGui.beginTabItem(t("難易度表編集", "Table Editor"))) {
-                renderMyDifficultyTableEditor();
-                ImGui.endTabItem();
-            }
             if (ImGui.beginTabItem(FontAwesomeIcons.Trophy + t(" レートランキング", " Rating"))) {
                 renderRanking();
                 ImGui.endTabItem();
             }
-            if (ImGui.beginTabItem(t("マニュアル", "Manual"))) {
-                renderManual();
+            if (ImGui.beginTabItem(t("ハイスピード", "HI-SPEED"))) {
+                renderSpeedBlock(false);
+                renderAlsoIn("プレイ設定のハイスピードタブ", "the HI-SPEED tab in Play Settings");
                 ImGui.endTabItem();
             }
             if (ImGui.beginTabItem(t("プロファイル", "Profiles"))) {
@@ -272,9 +265,22 @@ public final class BMSIRArenaOverlay {
                 renderSettings(config);
                 ImGui.endTabItem();
             }
+            if (ImGui.beginTabItem(t("マニュアル", "Manual"))) {
+                renderManual();
+                ImGui.endTabItem();
+            }
             ImGui.endTabBar();
         }
         ImGui.endChild();
+        ImGui.end();
+    }
+
+    /** The F5 menu's Table Editor window. */
+    public static void showMyDifficultyTableEditor(ImBoolean open) {
+        ImGui.setNextWindowSize(620, 640, ImGuiCond.FirstUseEver);
+        if (ImGui.begin(t("難易度表編集", "Table Editor") + "###my-table-editor", open)) {
+            renderMyDifficultyTableEditor();
+        }
         ImGui.end();
     }
 
@@ -1135,8 +1141,6 @@ public final class BMSIRArenaOverlay {
         ImGui.endDisabled();
         if (!editable) ImGui.textDisabled(t("コース制約またはリプレイ復元中は変更できません", "Locked by course rules or replay restoration"));
         else ImGui.textDisabled(t("各方式の設定を保持し、切替はその場で反映します", "Each speed mode retains its settings; switching applies immediately"));
-        ImGui.separator();
-        renderBgaDisplaySetting(config);
     }
 
     public static int hispeedModeIndex(String mode) {
@@ -3534,6 +3538,7 @@ public final class BMSIRArenaOverlay {
 
     /** Shared with the F5 menu's Display window. */
     public static void renderDisplayToggles(PlayerConfig config) {
+        renderBgaDisplaySetting(config);
         ImBoolean cursor = new ImBoolean(config.isBmsirArenaShowCursor());
         if (ImGui.checkbox(t("プレイ中もマウスカーソルを表示", "Show cursor during play"), cursor)) {
             config.setBmsirArenaShowCursor(cursor.get());

@@ -61,6 +61,7 @@ public class ImGuiRenderer {
     private static ImBoolean SHOW_PLAY_SETTINGS = new ImBoolean(false);
     private static ImBoolean SHOW_SOUND_SETTINGS = new ImBoolean(false);
     private static ImBoolean SHOW_DISPLAY_SETTINGS = new ImBoolean(false);
+    private static ImBoolean SHOW_MY_TABLE_EDITOR = new ImBoolean(false);
     private static ImBoolean SHOW_MANIAC_OPTIONS = new ImBoolean(false);
     private static final float MY_TABLE_BATCH_INDICATOR_DEFAULT_FONT_SCALE = 1.300f;
     private static final float MY_TABLE_BATCH_INDICATOR_DEFAULT_X_RATIO = 0.346f;
@@ -174,6 +175,7 @@ public class ImGuiRenderer {
             if (show(ModMenuItem.PLAY_SETTINGS)) ImGui.checkbox(t("プレイ設定", "Show Play Settings Window"), SHOW_PLAY_SETTINGS);
             if (show(ModMenuItem.SOUND_SETTINGS)) ImGui.checkbox(t("音", "Show Sound Window"), SHOW_SOUND_SETTINGS);
             if (show(ModMenuItem.DISPLAY_SETTINGS)) ImGui.checkbox(t("表示", "Show Display Window"), SHOW_DISPLAY_SETTINGS);
+            if (show(ModMenuItem.MY_TABLE_EDITOR)) ImGui.checkbox(t("難易度表編集", "Show Table Editor Window"), SHOW_MY_TABLE_EDITOR);
             if (show(ModMenuItem.MANIAC_OPTIONS) && ImGui.button("MANIAC OPTIONS")) showManiacOptions();
             ImGui.separator();
             ImBoolean showBmsirArenaOverlay = new ImBoolean(
@@ -222,6 +224,9 @@ public class ImGuiRenderer {
             }
             if (SHOW_DISPLAY_SETTINGS.get()) {
                 MiscSettingMenu.showDisplaySettings(SHOW_DISPLAY_SETTINGS);
+            }
+            if (SHOW_MY_TABLE_EDITOR.get()) {
+                BMSIRArenaOverlay.showMyDifficultyTableEditor(SHOW_MY_TABLE_EDITOR);
             }
 
 
@@ -534,6 +539,7 @@ public class ImGuiRenderer {
             case PLAY_SETTINGS -> SHOW_PLAY_SETTINGS.set(false);
             case SOUND_SETTINGS -> SHOW_SOUND_SETTINGS.set(false);
             case DISPLAY_SETTINGS -> SHOW_DISPLAY_SETTINGS.set(false);
+            case MY_TABLE_EDITOR -> SHOW_MY_TABLE_EDITOR.set(false);
             case BMSIR_ARENA_OVERLAY -> BMSIRArenaOverlay.setVisible(false);
             case MANIAC_OPTIONS -> {
                 SHOW_MANIAC_OPTIONS.set(false);

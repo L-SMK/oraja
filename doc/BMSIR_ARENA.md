@@ -213,6 +213,13 @@ player's table cannot be targeted and a concurrent Web/client edit reloads the
 authoritative selected table instead of being overwritten. Child-table levels
 managed by a cross-game master are shown read-only and continue to come from
 the master.
+
+The table editor is no longer an Arena overlay tab: open it from the F5 Mod
+Menu's `難易度表編集` / `Table Editor` window (filterable like other Mod Menu
+items). The music-select Arena overlay tabs are ordered Battle, Lobby / Rooms,
+Rating, HI-SPEED, Profiles, Settings, Manual; `BGAを表示` lives with the
+display toggles in Settings and the F5 Display window, not under HI-SPEED.
+
 Version `0.4.14.37` lets an existing table hold metadata and up to 64
 selected-chart add/update/remove changes as an in-memory draft. The overlay
 shows the pending count and
