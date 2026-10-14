@@ -168,6 +168,13 @@ mode's values, the chart position, and replay events. NO SPEED constraints
 and replay lane restoration lock the speed controls. BGA display can be
 toggled independently while its playback clock continues.
 
+The dedicated HI-SPEED tab selects Normal, LR2, or Floating independently
+for each key mode. Startup settings, the Arena overlay, and the F5 Play
+Settings window share the selection. Live switching preserves each speed
+mode's values, the chart position, and replay events. NO SPEED constraints
+and replay lane restoration lock the speed controls. BGA display can be
+toggled independently while its playback clock continues.
+
 Legacy global LR2 and per-mode floating settings migrate without changing
 the selected behavior. The new explicit per-mode selection is authoritative.
 The sidecar retains the independent speed values, fixed-BPM selection,
