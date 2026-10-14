@@ -1559,6 +1559,8 @@ public class BMSPlayer extends MainState {
 			PlayConfig live,
 			boolean bmsirLr2HispeedFixEnabled
 	) {
+		target.setBmsirFloatingHispeed(live.getBmsirFloatingHispeed());
+		target.setBmsirFloatingGreenFrames(live.getBmsirFloatingGreenFrames());
 		if (bmsirLr2HispeedFixEnabled) {
 			target.setHispeed(live.getHispeed());
 			target.setDuration(live.getDuration());

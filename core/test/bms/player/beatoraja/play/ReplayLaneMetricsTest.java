@@ -33,5 +33,20 @@ class ReplayLaneMetricsTest {
         set(renderer, LaneRenderer.class, "nowbpm", 480.0);
         renderer.applyReplayLaneState(ReplayLaneState.capture(100, recorded, false));
         assertEquals(480.0, renderer.getNowBPM()); assertEquals(250, renderer.getCurrentDuration());
+        recorded.setBmsirFloatingHispeedEnabled(true);
+        recorded.setBmsirFloatingHispeed(2);
+        recorded.setBmsirFloatingGreenFrames(30.12345f);
+        set(renderer, LaneRenderer.class, "nowbpm", 150.0);
+        renderer.applyReplayLaneState(ReplayLaneState.capture(100, recorded, false));
+        assertEquals(150, renderer.getNowBPM()); assertEquals(971, renderer.getCurrentDuration());
+        assertEquals(583, renderer.floatingGreenNumber(150, true));
+        renderer.changeHispeed(true);
+        assertEquals(2.5f, renderer.getHispeed()); assertEquals(150, renderer.getNowBPM());
+        assertEquals(30.12345f, renderer.getPlayConfig().getBmsirFloatingGreenFrames());
+        assertEquals(777, renderer.getCurrentDuration());
+        renderer.moveFloatingScratch(150);
+        assertEquals(3.5f, renderer.getHispeed(), 0.00001);
+        assertEquals(150, renderer.getNowBPM());
+        assertEquals(33.28717f, renderer.getPlayConfig().getBmsirFloatingGreenFrames(), 0.0001);
     }
 }

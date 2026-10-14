@@ -1,5 +1,8 @@
 # BMS-IR Arena oraja
 
+鍵盤モード別に選択できる[フローティングハイスピード](docs/FLOATING_HISPEED.md)を追加しました。
+倍率0.50～10.00、START＋鍵盤で±0.50、カバー操作時は保存緑数字へ戻ります。初期状態はOFFです。
+
 BMS-IR向けの専用LR2oraja Endless Dreamクライアントです。通常プレイに加え、
 BMS-IR Arena、BMS-IR固有設定、専用ランチャーなどを収録しています。
 

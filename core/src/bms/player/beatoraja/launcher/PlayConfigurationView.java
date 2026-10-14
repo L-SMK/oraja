@@ -228,6 +228,16 @@ public class PlayConfigurationView implements Initializable {
 	@FXML
 	private Spinner<Integer> bmsirHispeedReferenceBpm;
 	@FXML
+	private CheckBox bmsirFloatingHispeedEnabled;
+	@FXML
+	private Spinner<Double> bmsirFloatingHispeed;
+	@FXML
+	private Spinner<Integer> bmsirFloatingGreen;
+	@FXML
+	private Label bmsirFloatingMultiplierLabel;
+	@FXML
+	private Label bmsirFloatingGreenLabel;
+	@FXML
 	private CheckBox bmsirJudgeRankSortEnabled;
 	@FXML
 	private CheckBox bmsirJudgeRankSortSkinNoticeEnabled;
@@ -673,6 +683,12 @@ public class PlayConfigurationView implements Initializable {
 				)
 		);
 		bmsirHispeedMode.getItems().setAll(PlayMode.values());
+		bmsirFloatingHispeed.setValueFactory(new SpinnerValueFactory.DoubleSpinnerValueFactory(0.5, 10, 2, 0.5));
+		bmsirFloatingGreen.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(10, 6000, 300));
+		bmsirFloatingMultiplierLabel.setLabelFor(bmsirFloatingHispeed);
+		bmsirFloatingGreenLabel.setLabelFor(bmsirFloatingGreen);
+		bmsirFloatingHispeed.disableProperty().bind(bmsirFloatingHispeedEnabled.selectedProperty().not());
+		bmsirFloatingGreen.disableProperty().bind(bmsirFloatingHispeedEnabled.selectedProperty().not());
 		bmsirBaseScrollSpeed.disableProperty().bind(
 				bmsirLr2HispeedFixEnabled.selectedProperty().not()
 		);
@@ -1617,9 +1633,18 @@ public class PlayConfigurationView implements Initializable {
 								"モード別の基本スクロールと基準BPMで、既存のHI-SPEED FIX計算を上書きします。既定はOFFです。",
 								"Override the existing HI-SPEED FIX calculation with per-mode base scroll and reference BPM values. Off by default."),
 						sidebarSettingRow(bmsirSpecificTab, "対象モード", "Target mode",
-								"LR2仕様のHI-SPEED設定を編集する鍵盤モードを選びます。",
-								"Choose the key mode whose LR2-style HI-SPEED values you are editing.",
+								"ハイスピード設定を編集する鍵盤モードを選びます。",
+								"Choose the key mode whose HI-SPEED values you are editing.",
 								sidebarCombo(bmsirHispeedMode)),
+						sidebarSettingRow(bmsirSpecificTab, "bmsirFloatingHispeedEnabled", "フローティングハイスピード", "Floating HI-SPEED",
+								"選択したモードで有効になります。カバー操作で保存緑数字に戻り、鍵盤操作では保存緑数字を変更しません。",
+								"Enable for the selected mode. Cover adjustment restores the saved green number; key presses leave it unchanged."),
+						sidebarSettingRow(bmsirSpecificTab, "bmsirFloatingHispeed", "倍率", "Multiplier",
+								"0.50～10.00。START＋鍵盤で0.50ずつ変更します。",
+								"0.50-10.00. START + keys changes the multiplier by 0.50."),
+						sidebarSettingRow(bmsirSpecificTab, "bmsirFloatingGreen", "保存緑数字", "Saved green number",
+								"曲開始時とカバー操作時に使う緑数字です。フローティングがONのモードでは通常・LR2方式より優先します。",
+								"Used at song start and during cover adjustment. Floating takes precedence over normal and LR2 speed modes when enabled."),
 						sidebarSettingRow(bmsirSpecificTab, "bmsirBaseScrollSpeed", "基本スクロール", "Base scroll",
 								"100を等速として、選択したモードの速度倍率を設定します。",
 								"Set the speed multiplier for the selected mode, where 100 is 1.00x."),
@@ -3439,6 +3464,9 @@ public class PlayConfigurationView implements Initializable {
 		bmsirHispeedReferenceBpm.getValueFactory().setValue(
 				conf.getBmsirHispeedReferenceBpm()
 		);
+		bmsirFloatingHispeedEnabled.setSelected(conf.isBmsirFloatingHispeedEnabled());
+		bmsirFloatingHispeed.getValueFactory().setValue((double) conf.getBmsirFloatingHispeed());
+		bmsirFloatingGreen.getValueFactory().setValue(bms.player.beatoraja.play.BMSIRFloatingHispeed.greenNumber(conf.getBmsirFloatingGreenFrames()));
 	}
 
 	private void commitBmsirHispeedMode() {
@@ -3452,6 +3480,12 @@ public class PlayConfigurationView implements Initializable {
 		).getPlayconfig();
 		conf.setBmsirBaseScrollSpeed(getValue(bmsirBaseScrollSpeed));
 		conf.setBmsirHispeedReferenceBpm(getValue(bmsirHispeedReferenceBpm));
+		conf.setBmsirFloatingHispeedEnabled(bmsirFloatingHispeedEnabled.isSelected());
+		conf.setBmsirFloatingHispeed(getValue(bmsirFloatingHispeed).floatValue());
+		int green = getValue(bmsirFloatingGreen);
+		if (green != bms.player.beatoraja.play.BMSIRFloatingHispeed.greenNumber(conf.getBmsirFloatingGreenFrames())) {
+			conf.setBmsirFloatingGreenFrames(green / 10f);
+		}
 		conf.validate();
 	}
 

@@ -423,7 +423,7 @@ public class FloatPropertyFactory {
 				var song = state.resource.getSongdata();
 				var pc = state.resource.getPlayerConfig().getPlayConfig(song.getMode())
 						.getPlayconfig();
-				return pc.getHispeed();
+				return bms.player.beatoraja.play.BMSIRFloatingHispeed.displayMultiplier(pc);
 			}
 			return Float.MIN_VALUE;
 		}),
