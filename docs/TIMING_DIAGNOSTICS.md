@@ -35,6 +35,16 @@ setting and restart after the capture is complete.
 
 ## Metric meaning
 
+The development body reduces steady Lua callback allocation: `main_state.time`,
+`timer`, `number`, and `float_number` reuse immutable numeric wrappers when the
+freshly read value is unchanged. Each keyed cache has 128 fixed slots; collisions
+replace a wrapper rather than growing the cache. Underlying getters still run on
+every invocation, including multiple calls at one frame timestamp, so timer,
+input, score and preview updates are not cached away. Standard Lua `type()` names
+also reuse immutable strings. Lua scripts can still replace `type` themselves.
+This reduces allocation pressure; it does not establish a GC pause deadline or
+prove that every BGA/frame stall is resolved.
+
 All timing distributions contain `count`, `average_us`, `p50_us`, `p95_us`,
 `p99_us`, `max_us`, and `max_at`. `max_at` is the UTC instant at which the
 period's maximum was observed. Percentiles use fixed upper-bound buckets, so
