@@ -1,6 +1,8 @@
 package bms.player.beatoraja.arena.bmsir;
 
 import bms.player.beatoraja.PlayerConfig;
+import bms.player.beatoraja.PlayConfig;
+import bms.model.Mode;
 import bms.player.beatoraja.system.RobustFile;
 
 import com.badlogic.gdx.utils.Json;
@@ -30,6 +32,38 @@ public final class BMSIRArenaConfigStore {
             LoggerFactory.getLogger(BMSIRArenaConfigStore.class);
 
     private BMSIRArenaConfigStore() {
+    }
+
+    private static final class FloatingSettings {
+        private int mode;
+        private boolean enabled;
+        private float multiplier = 2f;
+        private float greenFrames = 30f;
+        private boolean coverVisible = true;
+
+        static FloatingSettings from(int mode, PlayConfig pc) {
+            FloatingSettings settings = new FloatingSettings();
+            settings.mode = mode;
+            settings.enabled = pc.isBmsirFloatingHispeedEnabled();
+            settings.multiplier = pc.getBmsirFloatingHispeed();
+            settings.greenFrames = pc.getBmsirFloatingGreenFrames();
+            settings.coverVisible = pc.isBmsirFloatingCoverVisible();
+            return settings;
+        }
+
+        boolean supportedMode() {
+            return mode == Mode.BEAT_5K.id || mode == Mode.BEAT_7K.id || mode == Mode.BEAT_10K.id
+                    || mode == Mode.BEAT_14K.id || mode == Mode.POPN_9K.id
+                    || mode == Mode.KEYBOARD_24K.id || mode == Mode.KEYBOARD_24K_DOUBLE.id;
+        }
+
+        void applyTo(PlayConfig pc) {
+            pc.setBmsirFloatingHispeedEnabled(enabled);
+            pc.setBmsirFloatingHispeed(multiplier);
+            pc.setBmsirFloatingGreenFrames(greenFrames);
+            pc.setBmsirFloatingCoverVisible(coverVisible);
+            pc.validate();
+        }
     }
 
     /**
@@ -134,7 +168,7 @@ public final class BMSIRArenaConfigStore {
 
     /** Explicit allow-list. Do not replace with PlayerConfig serialization. */
     static final class Settings {
-        private int schemaVersion = 22;
+        private int schemaVersion = 23;
         private Boolean oneBassEnabled;
         private Boolean startHerePreviewEnabled;
         private Boolean danLocalSyncEnabled;
@@ -182,6 +216,7 @@ public final class BMSIRArenaConfigStore {
         private int[] baseScrollSpeeds;
         private int[] hispeedReferenceBpms;
         private float[] hispeedMargins;
+        private FloatingSettings[] floatingHispeeds;
         private Boolean judgeRankSortEnabled;
         private Boolean judgeRankSortSkinNoticeEnabled;
         private String[] numpadActions;
@@ -265,6 +300,13 @@ public final class BMSIRArenaConfigStore {
             settings.hispeedReferenceBpms =
                     player.getBmsirHispeedReferenceBpms();
             settings.hispeedMargins = player.getBmsirHispeedMargins();
+            Mode[] modes = {Mode.BEAT_5K, Mode.BEAT_7K, Mode.BEAT_10K, Mode.BEAT_14K,
+                    Mode.POPN_9K, Mode.KEYBOARD_24K, Mode.KEYBOARD_24K_DOUBLE};
+            settings.floatingHispeeds = new FloatingSettings[modes.length];
+            for (int i = 0; i < modes.length; i++) {
+                settings.floatingHispeeds[i] = FloatingSettings.from(modes[i].id,
+                        player.getPlayConfig(modes[i]).getPlayconfig());
+            }
             settings.judgeRankSortEnabled =
                     player.isBmsirJudgeRankSortEnabled();
             settings.judgeRankSortSkinNoticeEnabled =
@@ -409,6 +451,11 @@ public final class BMSIRArenaConfigStore {
             }
             if (hispeedMargins != null) {
                 player.setBmsirHispeedMargins(hispeedMargins);
+            }
+            if (floatingHispeeds != null) {
+                for (FloatingSettings settings : floatingHispeeds) {
+                    if (settings != null && settings.supportedMode()) settings.applyTo(player.getPlayConfig(settings.mode).getPlayconfig());
+                }
             }
             if (judgeRankSortEnabled != null) {
                 player.setBmsirJudgeRankSortEnabled(judgeRankSortEnabled);

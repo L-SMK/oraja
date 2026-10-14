@@ -1,5 +1,9 @@
 # BMS-IR Arena client
 
+鍵盤モード別の[フローティングハイスピード](../docs/FLOATING_HISPEED.md)を追加しました。
+設定画面と通常・コンパクトのオーバーレイから有効にできます。保存緑数字、カバー操作、
+リプレイ対応はリンク先に記載しています。初期状態はOFFです。
+
 Status: BMS-IR Arena v1 release branch. This source prepares the unified
 `Arena oraja 0.4.14.58`. It replaces the separate Endless Dream and
 beatoraja Arena bodies and lets one installation select LR2 or oraja

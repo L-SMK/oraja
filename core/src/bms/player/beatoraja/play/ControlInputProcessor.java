@@ -131,6 +131,7 @@ public final class ControlInputProcessor {
 	}
 
 	private boolean usesSixSevenCoverControl(LaneRenderer laneRenderer, int key) {
+		if (laneRenderer.isFloatingHispeedEnabled()) return false;
 		if (!isSixSevenKey(player.getMode(), key)) {
 			return false;
 		}
@@ -287,12 +288,18 @@ public final class ControlInputProcessor {
 					processStart.run();
 				} else if ((autoplay.mode == BMSPlayerMode.Mode.PLAY || autoplay.mode == BMSPlayerMode.Mode.PRACTICE) && !startpressed) {
 					Arrays.fill(hschanged, true);
+					if (lanerender.isFloatingHispeedEnabled()) {
+						for (int i = 0; i < hschanged.length; i++) {
+							if (input.isAnalogInput(i)) input.getAnalogDiffAndReset(i, 200);
+						}
+					}
 				}
 				// show-hide lane cover by double-press START
 				if (!startpressed) {
 					long stime = System.currentTimeMillis();
-					if (stime < startpressedtime + 500) {
-						lanerender.setEnableLanecover(!lanerender.isEnableLanecover());
+					if (stime < startpressedtime + (lanerender.isFloatingHispeedEnabled() ? 234 : 500)) {
+						if (lanerender.isFloatingHispeedEnabled()) lanerender.toggleFloatingCover();
+						else lanerender.setEnableLanecover(!lanerender.isEnableLanecover());
 						startpressedtime = 0;
 					} else {
 						startpressedtime = stime;
@@ -392,6 +399,10 @@ public final class ControlInputProcessor {
 	 */
 	private void setCoverValue(float value) {
 		final LaneRenderer lanerender = player.getLanerender();
+		if (lanerender.isFloatingHispeedEnabled()) {
+			lanerender.moveFloatingScratch(value * 723f);
+			return;
+		}
 		boolean recalculateHispeed = shouldRecalculateCoverHispeed(
 				hispeedAutoAdjust,
 				lanerender.getNowBPM()
@@ -420,6 +431,18 @@ public final class ControlInputProcessor {
 	private void changeCoverValue(int key, boolean up) {
 		final BMSPlayerInputProcessor input = player.main.getInputProcessor();
 		final LaneRenderer lanerender = player.getLanerender();
+		if (lanerender.isFloatingHispeedEnabled()) {
+			if (input.isAnalogInput(key)) {
+				lanerender.moveFloatingScratch(input.getAnalogDiffAndReset(key, 200) * (up ? 1 : -1));
+			} else if (input.getKeyState(key)) {
+				long now = System.currentTimeMillis();
+				if (now - lanecovertiming > 50) {
+					lanerender.moveFloatingScratch(up ? 1 : -1);
+					lanecovertiming = now;
+				}
+			}
+			return;
+		}
 
 		if (usesFloatingHispeed(
 				hispeedAutoAdjust,
