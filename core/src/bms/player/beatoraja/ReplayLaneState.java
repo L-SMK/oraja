@@ -18,6 +18,7 @@ public final class ReplayLaneState {
     }
     public static boolean validConfig(PlayConfig config) {
         return config != null && Float.isFinite(config.getHispeed()) && config.getHispeed() > 0
+                && (config.getBmsirLr2Hispeed() == null || Float.isFinite(config.getBmsirLr2Hispeed()))
                 && (!config.isBmsirFloatingHispeedEnabled()
                     || (Float.isFinite(config.getBmsirFloatingHispeed())
                         && Float.isFinite(config.getBmsirFloatingGreenFrames())))
@@ -55,12 +56,16 @@ public final class ReplayLaneState {
         target.setBmsirFloatingGreenFrames(source.getBmsirFloatingGreenFrames());
         target.setBmsirFloatingCoverVisible(source.isBmsirFloatingCoverVisible());
         target.setBmsirFloatingSuddenLiftVisiblePixels(source.getBmsirFloatingSuddenLiftVisiblePixels());
+        target.setBmsirHispeedMode(source.getBmsirHispeedMode());
+        target.setBmsirLr2Hispeed(source.getBmsirLr2Hispeed());
     }
 
     public boolean sameDisplay(ReplayLaneState other) {
         if (other == null || config == null || other.config == null) return false;
         PlayConfig a = config, b = other.config;
         return a.getHispeed() == b.getHispeed() && a.getDuration() == b.getDuration()
+                && java.util.Objects.equals(a.getBmsirHispeedMode(), b.getBmsirHispeedMode())
+                && java.util.Objects.equals(a.getBmsirLr2Hispeed(), b.getBmsirLr2Hispeed())
                 && a.getFixhispeed() == b.getFixhispeed()
                 && a.isBmsirFloatingHispeedEnabled() == b.isBmsirFloatingHispeedEnabled()
                 && a.getBmsirFloatingHispeed() == b.getBmsirFloatingHispeed()

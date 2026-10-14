@@ -239,6 +239,24 @@ public final class ControlInputProcessor {
 		enableControl = b;
 	}
 
+	public void resetAfterHispeedModeChange() {
+		BMSPlayerInputProcessor input = player.main.getInputProcessor();
+		Arrays.fill(hschanged, true);
+		startpressed = input.startPressed();
+		selectpressed = input.isSelectPressed();
+		startAndSelectPressed = input.startPressed() && input.isSelectPressed();
+		startpressedtime = 0;
+		selectDoublePress.clear(input.isSelectPressed());
+		laneCoverStartTiming = Long.MIN_VALUE;
+		lanecovertiming = System.currentTimeMillis();
+		cursorpressed = true;
+		hispeedAutoAdjust = player.getLanerender().getPlayConfig().isEnableHispeedAutoAdjust();
+		coverChangeMarginLow = player.getLanerender().getPlayConfig().getLanecovermarginlow();
+		coverChangeMarginHigh = player.getLanerender().getPlayConfig().getLanecovermarginhigh();
+		coverSpeedSwitchDuration = player.getLanerender().getPlayConfig().getLanecoverswitchduration();
+		for (int i = 0; i < hschanged.length; i++) if (input.isAnalogInput(i)) input.getAnalogDiffAndReset(i, 200);
+	}
+
 	public void setEnableCursor(boolean b) {
 		enableCursor = b;
 	}
@@ -372,6 +390,7 @@ public final class ControlInputProcessor {
 		SelectDoublePress(boolean initiallyPressed) {
 			pressed = initiallyPressed;
 		}
+		void clear(boolean down) { previousPress = -1; pressed = down; }
 
 		boolean update(boolean down, boolean eligible, long now) {
 			if (!eligible) {

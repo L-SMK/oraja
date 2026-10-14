@@ -377,6 +377,13 @@ from the per-mode HI-SPEED change step. The override is disabled for NO SPEED
 constraints and is snapshotted into replays. It does not add a pseudo-FHS
 chord or an equivalent-green editor.
 
+The dedicated HI-SPEED tab selects Normal, LR2, or Floating independently
+for each key mode. Startup settings, the Arena overlay, and the F5 Play
+Settings window share the selection. Live switching preserves each speed
+mode's values, the chart position, and replay events. NO SPEED constraints
+and replay lane restoration lock the speed controls. BGA display can be
+toggled independently while its playback clock continues.
+
 The launcher Skin settings provide a default-on switch for the live Skin
 Select preview. Turning it off skips preview construction, reload, and render
 work while leaving skin selection and all custom options available. The choice

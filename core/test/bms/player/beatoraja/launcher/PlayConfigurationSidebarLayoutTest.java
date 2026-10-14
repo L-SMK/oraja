@@ -57,6 +57,15 @@ class PlayConfigurationSidebarLayoutTest {
 	}
 
 	@Test
+	void unchangedGreenKeepsOriginalDurationAndModeSelectionIsExclusive() {
+		assertEquals(449, PlayConfigurationView.normalDurationForGreen(449, 269));
+		assertEquals(475, PlayConfigurationView.normalDurationForGreen(449, 285));
+		assertEquals("normal", PlayConfigurationView.speedModeForIndex(0));
+		assertEquals("lr2", PlayConfigurationView.speedModeForIndex(1));
+		assertEquals("floating", PlayConfigurationView.speedModeForIndex(2));
+	}
+
+	@Test
 	void floatingControlsHavePlainLocalizedLabelsAndAssociatedFields() throws Exception {
 		Document document = loadFxml("PlayConfigurationView.fxml");
 		assertEquals("Spinner", elementWithFxId(document, "bmsirFloatingHispeed").getTagName());

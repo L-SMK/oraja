@@ -233,11 +233,14 @@ public final class BMSIRArenaOverlay {
         renderPhaseBanner(false);
         renderPinnedRoomReady(config);
 		bms.player.beatoraja.modmenu.FunctionKeyMenu.renderOpenButton();
-		renderSpeedBlock(false);
-		renderAlsoIn("プレイ設定", "Play Settings");
         ImGui.separator();
         if (ImGui.beginChild("##bmsir-arena-scroll-content", 0, 0, false)
                 && ImGui.beginTabBar("##bmsir-arena-tabs")) {
+            if (ImGui.beginTabItem(t("ハイスピード", "HI-SPEED"))) {
+                renderSpeedBlock(false);
+                renderAlsoIn("プレイ設定のハイスピードタブ", "the HI-SPEED tab in Play Settings");
+                ImGui.endTabItem();
+            }
             if (ImGui.beginTabItem(t("対戦", "Battle"))) {
                 renderQueueActions();
                 ImGui.separator();
@@ -1051,175 +1054,113 @@ public final class BMSIRArenaOverlay {
 
     private static void renderSpeedBlock(boolean compact) {
         PlayerConfig config = BMSIRArenaClient.playerConfig();
-        if (config == null) {
-            return;
-		}
-		String suffix = compact ? "-compact" : "-full";
-		int currentModeId = resolveHispeedEditorMode(
-				PlayerConfig.BMSIR_HISPEED_EDITOR_FOLLOW_CURRENT,
-				BMSIRArenaClient.currentPlayModeForLayout()
-		);
-		HISPEED_EDITOR_MODE.set(hispeedEditorModeIndex(
-				config.getBmsirHispeedEditorMode()
-		));
-		ImGui.setNextItemWidth(compact ? 150.0f : 210.0f);
-		if (ImGui.combo(
-				t("編集MODE", "Edit mode") + "##speed-editor-mode" + suffix,
-				HISPEED_EDITOR_MODE,
-				hispeedEditorModeLabels()
-		)) {
-			config.setBmsirHispeedEditorMode(
-					hispeedEditorModeId(HISPEED_EDITOR_MODE.get())
-			);
-			saveSettingsOrWarn();
-		}
-		COVER_CHANGE_STEP.set(config.getBmsirCoverChangeStep());
-		ImGui.setNextItemWidth(compact ? 120.0f : 180.0f);
-		if (ImGui.inputInt(
-				coverChangeStepLabel() + "##cover-change-step" + suffix,
-				COVER_CHANGE_STEP
-		)) {
-			applyCoverChangeStep(config, COVER_CHANGE_STEP.get());
-			COVER_CHANGE_STEP.set(config.getBmsirCoverChangeStep());
-			saveSettingsOrWarn();
-		}
-		ImGui.textDisabled(t(
-				"数値入力 1～1000（全MODE共通）",
-				"Numeric input 1-1000 (shared across modes)"
-		));
-		int modeId = resolveHispeedEditorMode(
-				config.getBmsirHispeedEditorMode(),
-				currentModeId
-		);
-		PlayConfig saved = config.getPlayConfig(modeId).getPlayconfig();
-		LaneRenderer live = BMSIRArenaClient.currentLaneRenderer(modeId);
-		LaneRenderer currentLive = BMSIRArenaClient.currentLaneRenderer(currentModeId);
-		ImGui.separator();
-		ImBoolean floating = new ImBoolean(saved.isBmsirFloatingHispeedEnabled());
-		ImGui.beginDisabled(currentLive != null);
-		if (ImGui.checkbox(t("フローティングハイスピード", "Floating HI-SPEED") + "##floating" + suffix, floating)) {
-			saved.setBmsirFloatingHispeedEnabled(floating.get());
-			saveSettingsOrWarn();
-		}
-		ImGui.endDisabled();
-		if (floating.get()) {
-			PlayConfig floatingConfig = live != null ? live.getPlayConfig() : saved;
-			ImFloat multiplier = new ImFloat(floatingConfig.getBmsirFloatingHispeed());
-			ImGui.setNextItemWidth(compact ? 120f : 180f);
-			if (ImGui.inputFloat(t("倍率", "Multiplier") + "##floating-multiplier" + suffix, multiplier)) {
-				float value = bms.player.beatoraja.play.BMSIRFloatingHispeed.clampMultiplier(multiplier.get());
-				saved.setBmsirFloatingHispeed(value);
-				if (live != null) live.setHispeed(value);
-				saveSettingsOrWarn();
-			}
-			ImInt green = new ImInt(bms.player.beatoraja.play.BMSIRFloatingHispeed.greenNumber(floatingConfig.getBmsirFloatingGreenFrames()));
-			ImGui.setNextItemWidth(compact ? 120f : 180f);
-			if (ImGui.inputInt(t("保存緑数字", "Saved green number") + "##floating-green" + suffix, green)) {
-				float frames = Math.max(10, Math.min(6000, green.get())) / 10f;
-				saved.setBmsirFloatingGreenFrames(frames);
-				if (live != null) {
-					floatingConfig.setBmsirFloatingGreenFrames(frames);
-					live.resetHispeed(live.getNowBPM());
-				}
-				saveSettingsOrWarn();
-			}
-			ImGui.textWrapped(t("倍率 0.50～10.00。START＋鍵盤 ±0.50。カバー操作で保存緑数字に戻ります。",
-					"Multiplier 0.50-10.00. START + keys: ±0.50. Cover adjustment restores the saved green number."));
-			return;
-		}
-		boolean enabled = currentLive != null
-				? currentLive.isBmsirLr2HispeedFixEnabled()
-				: config.isBmsirLr2HispeedFixEnabled();
-		PlayConfig active = live != null && enabled
-				? live.getPlayConfig()
-				: saved;
-		int base = active.getBmsirBaseScrollSpeed();
-		int referenceBpm = active.getBmsirHispeedReferenceBpm();
-		float hispeedChangeStep = active.getHispeedMargin();
-
+        if (config == null) return;
+        String suffix = compact ? "-compact" : "-full";
+        int current = BMSIRArenaClient.currentPlayModeForLayout();
+        HISPEED_EDITOR_MODE.set(hispeedEditorModeIndex(config.getBmsirHispeedEditorMode()));
+        ImGui.setNextItemWidth(compact ? 150f : 210f);
+        if (ImGui.combo(t("対象モード", "Key mode") + "##speed-mode" + suffix,
+                HISPEED_EDITOR_MODE, hispeedEditorModeLabels())) {
+            config.setBmsirHispeedEditorMode(hispeedEditorModeId(HISPEED_EDITOR_MODE.get()));
+            saveSettingsOrWarn();
+        }
+        int modeId = resolveHispeedEditorMode(config.getBmsirHispeedEditorMode(), current);
+        PlayConfig saved = config.getPlayConfig(modeId).getPlayconfig();
+        LaneRenderer live = BMSIRArenaClient.currentLaneRenderer(modeId);
+        PlayConfig active = live != null ? live.getPlayConfig() : saved;
+        String mode = active.resolveBmsirHispeedMode(config.isBmsirLr2HispeedFixEnabled());
+        boolean editable = live == null || live.canChangeHispeedMode();
+        ImGui.beginDisabled(!editable);
+        ImInt selected = new ImInt(hispeedModeIndex(mode));
+        ImGui.setNextItemWidth(compact ? 180f : 260f);
+        if (ImGui.combo(t("方式", "Speed mode") + "##speed-kind" + suffix, selected,
+                new String[]{t("通常", "Normal"), "LR2", t("フローティング", "Floating")})) {
+            applyHispeedMode(config, modeId, hispeedModeValue(selected.get()), live);
+            mode = active.resolveBmsirHispeedMode(config.isBmsirLr2HispeedFixEnabled());
+            saveSettingsOrWarn();
+        }
         ImGui.separator();
-		ImBoolean enabledValue = new ImBoolean(enabled);
-		ImGui.beginDisabled(currentLive != null);
-		if (ImGui.checkbox(
-				t("LR2ハイスピ固定", "LR2 fixed HI-SPEED"),
-				enabledValue
-		)) {
-			enabled = enabledValue.get();
-			config.setBmsirLr2HispeedFixEnabled(enabled);
-			saveSettingsOrWarn();
-		}
-		ImGui.endDisabled();
-		if (currentLive != null) {
-			ImGui.sameLine();
-			ImGui.textDisabled(t("次のプレイから変更できます", "Can be changed for the next play"));
-		}
-		if (!enabled) {
-			return;
-		}
-        ImGui.text(String.format(
-                Locale.ROOT,
-				"EDIT %s / FIX %s",
-				hispeedEditorModeLabel(config.getBmsirHispeedEditorMode(), modeId),
-                hispeedFixLabel(active.getFixhispeed())
-        ));
-        ImGui.text(String.format(
-                Locale.ROOT,
-				"BASE %d / REF %d BPM / HS %.2f / STEP %.2f",
-                base,
-                referenceBpm,
-				active.getHispeed(),
-				hispeedChangeStep
-        ));
-		HISPEED_VALUE.set(active.getHispeed());
-		ImGui.setNextItemWidth(compact ? 120.0f : 180.0f);
-		if (ImGui.inputFloat(
-				hispeedValueLabel() + "##hispeed-value" + suffix,
-				HISPEED_VALUE
-		)) {
-			applyHispeedValue(config, modeId, HISPEED_VALUE.get(), live);
-			HISPEED_VALUE.set(clampHispeedValue(HISPEED_VALUE.get()));
-		}
-		ImGui.textDisabled(t(
-				"数値入力 0.01～20.00（モード別）",
-				"Numeric input 0.01-20.00 (per mode)"
-		));
-        if (ImGui.smallButton("-##speed-base-minus" + suffix)) {
-            applyBaseScroll(config, modeId, base - 1, live);
+        if (PlayConfig.HISPEED_MODE_FLOATING.equals(mode)) {
+            ImInt green = new ImInt(bms.player.beatoraja.play.BMSIRFloatingHispeed.greenNumber(active.getBmsirFloatingGreenFrames()));
+            if (ImGui.inputInt(t("保存緑数字", "Saved green number") + suffix, green)) {
+                float frames = Math.max(10, Math.min(6000, green.get())) / 10f;
+                saved.setBmsirFloatingGreenFrames(frames);
+                if (live != null) { active.setBmsirFloatingGreenFrames(frames); live.resetHispeed(live.getNowBPM()); }
+                saveSettingsOrWarn();
+            }
+            ImFloat multiplier = new ImFloat(active.getBmsirFloatingHispeed());
+            if (ImGui.inputFloat(t("倍率", "Multiplier") + suffix, multiplier)) {
+                float value = bms.player.beatoraja.play.BMSIRFloatingHispeed.clampMultiplier(multiplier.get());
+                saved.setBmsirFloatingHispeed(value);
+                if (live != null) live.setHispeed(value);
+                saveSettingsOrWarn();
+            }
+            ImGui.textWrapped(t("START＋黒鍵／白鍵：倍率 ±0.50。カバー操作で保存緑数字に戻ります。",
+                    "START + black/white keys: ±0.50. Cover adjustment restores the saved green number."));
+        } else {
+            ImInt fix = new ImInt(active.getFixhispeed());
+            if (ImGui.combo("HI-SPEED FIX" + suffix, fix, new String[]{"OFF", "START", "MAX", "MAIN", "MIN"})) {
+                saved.setFixhispeed(fix.get());
+                if (live != null) live.setFixHispeed(fix.get());
+                saveSettingsOrWarn();
+            }
+            if (PlayConfig.HISPEED_MODE_NORMAL.equals(mode) && active.getFixhispeed() != PlayConfig.FIX_HISPEED_OFF) {
+                ImInt green = new ImInt(active.getDuration() * 3 / 5);
+                if (ImGui.inputInt(t("緑数字", "Green number") + suffix, green)) {
+                    int duration = Math.max(1, Math.min(PlayConfig.DURATION_MAX, Math.round(green.get() * 5f / 3f)));
+                    saved.setDuration(duration);
+                    if (live != null) live.setDuration(duration);
+                    saveSettingsOrWarn();
+                }
+            }
+            ImFloat value = new ImFloat(PlayConfig.HISPEED_MODE_LR2.equals(mode) ? active.getEffectiveLr2Hispeed() : active.getHispeed());
+            if (ImGui.inputFloat(hispeedValueLabel() + suffix, value)) {
+                applyHispeedValue(config, modeId, value.get(), live);
+                saveSettingsOrWarn();
+            }
+            ImFloat step = new ImFloat(active.getHispeedMargin());
+            if (ImGui.inputFloat(t("倍率の変更幅", "Speed step") + suffix, step)) {
+                float margin = clampHispeedChangeStep(step.get());
+                saved.setHispeedMargin(margin);
+                if (live != null) { active.setHispeedMargin(margin); live.setHispeedmargin(margin); }
+                saveSettingsOrWarn();
+            }
+            if (PlayConfig.HISPEED_MODE_LR2.equals(mode)) {
+                ImInt base = new ImInt(active.getBmsirBaseScrollSpeed());
+                ImInt reference = new ImInt(active.getBmsirHispeedReferenceBpm());
+                if (ImGui.inputInt(t("基本スクロール", "Base scroll") + suffix, base)) applyBaseScroll(config, modeId, base.get(), live);
+                if (ImGui.inputInt(t("基準BPM", "Reference BPM") + suffix, reference)) applyReferenceBpm(config, modeId, reference.get(), live);
+            }
         }
-        ImGui.sameLine();
-        ImGui.text("BASE");
-        ImGui.sameLine();
-        if (ImGui.smallButton("+##speed-base-plus" + suffix)) {
-            applyBaseScroll(config, modeId, base + 1, live);
+        ImGui.endDisabled();
+        if (!editable) ImGui.textDisabled(t("コース制約またはリプレイ復元中は変更できません", "Locked by course rules or replay restoration"));
+        else ImGui.textDisabled(t("各方式の設定を保持し、切替はその場で反映します", "Each speed mode retains its settings; switching applies immediately"));
+        ImGui.separator();
+        renderBgaDisplaySetting(config);
+    }
+
+    public static int hispeedModeIndex(String mode) {
+        return PlayConfig.HISPEED_MODE_LR2.equals(mode) ? 1 : PlayConfig.HISPEED_MODE_FLOATING.equals(mode) ? 2 : 0;
+    }
+
+    static String hispeedModeValue(int index) {
+        return index == 1 ? PlayConfig.HISPEED_MODE_LR2 : index == 2 ? PlayConfig.HISPEED_MODE_FLOATING : PlayConfig.HISPEED_MODE_NORMAL;
+    }
+
+    static boolean applyHispeedMode(PlayerConfig config, int modeId, String mode, LaneRenderer live) {
+        if (PlayConfig.normalizeHispeedMode(mode) == null || (live != null && !live.setBmsirHispeedMode(mode))) return false;
+        config.getPlayConfig(modeId).getPlayconfig().setBmsirHispeedMode(mode);
+        return true;
+    }
+
+    public static void renderBgaDisplaySetting(PlayerConfig config) {
+        ImBoolean visible = new ImBoolean(config.isBmsirBgaDisplayEnabled());
+        if (ImGui.checkbox(t("BGAを表示", "Show BGA"), visible)) {
+            config.setBmsirBgaDisplayEnabled(visible.get());
+            saveSettingsOrWarn();
         }
-        ImGui.sameLine();
-        if (ImGui.smallButton("-##speed-reference-minus" + suffix)) {
-            applyReferenceBpm(config, modeId, referenceBpm - 1, live);
-        }
-        ImGui.sameLine();
-        ImGui.text("REF BPM");
-        ImGui.sameLine();
-        if (ImGui.smallButton("+##speed-reference-plus" + suffix)) {
-            applyReferenceBpm(config, modeId, referenceBpm + 1, live);
-        }
-		HISPEED_CHANGE_STEP.set(hispeedChangeStep);
-		ImGui.setNextItemWidth(compact ? 120.0f : 180.0f);
-		if (ImGui.inputFloat(
-				t("HI-SPEED変化間隔", "HI-SPEED change step")
-						+ "##speed-change-step" + suffix,
-				HISPEED_CHANGE_STEP
-		)) {
-			applyHispeedChangeStep(
-					config,
-					modeId,
-					HISPEED_CHANGE_STEP.get(),
-					live
-			);
-		}
-		ImGui.textDisabled(t(
-				"数値入力 0.00～10.00（モード別）",
-				"Numeric input 0.00-10.00 (per mode)"
-		));
+        if (BMSIRArenaClient.isGameplayState() && !BMSIRArenaClient.currentBgaLoaded())
+            ImGui.textDisabled(t("BGA読込OFFで開始した曲は、表示ONにしても再読込しません", "A chart started without BGA loading cannot load it during play"));
     }
 
 	static int[] hispeedEditorModeIds() {
@@ -1379,10 +1320,12 @@ public final class BMSIRArenaOverlay {
 	) {
 		float clamped = clampHispeedValue(value);
 		PlayConfig saved = config.getPlayConfig(modeId).getPlayconfig();
-		saved.setHispeed(clamped);
+		boolean lr2 = PlayConfig.HISPEED_MODE_LR2.equals(saved.resolveBmsirHispeedMode(config.isBmsirLr2HispeedFixEnabled()));
+		if (lr2) saved.setBmsirLr2Hispeed(clamped); else saved.setHispeed(clamped);
 		saved.validate();
-		if (live != null && live.isBmsirLr2HispeedFixEnabled()) {
+		if (live != null && live.canChangeHispeedMode()) {
 			live.setHispeed(clamped);
+			saved.setDuration(live.getPlayConfig().getDuration());
 		}
 	}
 

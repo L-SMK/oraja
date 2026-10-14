@@ -18,7 +18,8 @@ public final class BMSIRFloatingHispeed {
     }
 
     public static float displayMultiplier(PlayConfig pc) {
-        return pc.isBmsirFloatingHispeedEnabled() ? pc.getBmsirFloatingHispeed() : pc.getHispeed();
+        return pc.isBmsirFloatingHispeedEnabled() ? pc.getBmsirFloatingHispeed()
+                : PlayConfig.HISPEED_MODE_LR2.equals(pc.getBmsirHispeedMode()) ? pc.getEffectiveLr2Hispeed() : pc.getHispeed();
     }
 
     public static boolean hasCover(PlayConfig pc) {

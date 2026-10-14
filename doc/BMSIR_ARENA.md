@@ -161,23 +161,17 @@ scroll and reference-BPM values. Base 100 is 1.00x; reference BPM defaults to
 150 and is adjustable from 50 through 400 in steps of 1. The existing
 OFF/START/MAX/MAIN/MIN HI-SPEED FIX choice selects the chart BPM target.
 
-The BMS-IR settings page has an independent mode selector for these values.
-During Music Select, both the full and compact Arena overlays expose the
-override ON/OFF switch plus base-scroll and reference-BPM controls. The
-overlay editor follows the selected chart mode by default or can be pinned to
-5KEY, 7KEY, 9KEY/PMS, 10KEY DP, 14KEY DP, 24KEY, or 24KEY DP. A labeled
-numeric field edits the normal per-mode HI-SPEED change margin from 0.00
-through 10.00. A separate numeric field directly edits the selected mode's
-HI-SPEED from 0.01 through 20.00 and updates a matching live lane immediately.
-The launcher names the existing `Long Note Modify Mode` as
-`強制LN／ロングノート変換` in Japanese, while preserving its OFF, REMOVE, and
-ADD LN/CN/HCN/ALL behavior, so the option remains visible in both the classic
-and searchable sidebar layouts. The dedicated equivalent-green editor/readout
-and pseudo FHS are not provided; START+SELECT therefore keeps the ordinary
-play behavior. NO
-SPEED courses ignore the override, and replay data stores whether the original
-play used it. Existing configs default the switch off, the editor to follow
-the current chart, base scroll to 100, and reference BPM to 150.
+The dedicated HI-SPEED tab selects Normal, LR2, or Floating independently
+for each key mode. Startup settings, the Arena overlay, and the F5 Play
+Settings window share the selection. Live switching preserves each speed
+mode's values, the chart position, and replay events. NO SPEED constraints
+and replay lane restoration lock the speed controls. BGA display can be
+toggled independently while its playback clock continues.
+
+Legacy global LR2 and per-mode floating settings migrate without changing
+the selected behavior. The new explicit per-mode selection is authoritative.
+The sidecar retains the independent speed values, fixed-BPM selection,
+and BGA display preference when an older body rewrites config_player.json.
 
 Version `0.4.14.58` replaces the untraceable legacy Windows PortAudio and
 JPortAudio binaries with a clean x86-64 build from pinned PortAudio 19.7.0 and
