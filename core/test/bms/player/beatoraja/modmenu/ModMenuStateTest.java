@@ -20,9 +20,9 @@ class ModMenuStateTest {
                 Map.entry(ModMenuItem.SONG_MANAGER, "SHOW_SONG_MANAGER"),
                 Map.entry(ModMenuItem.DOWNLOAD_TASKS, "SHOW_DOWNLOAD_MENU"),
                 Map.entry(ModMenuItem.PERFORMANCE_MONITOR, "SHOW_PERFORMANCE_MONITOR"),
-                Map.entry(ModMenuItem.MISC_SETTINGS, "SHOW_MISC_SETTING"),
-                Map.entry(ModMenuItem.LEGACY_ARENA_MENU, "SHOW_ARENA_MENU"),
-                Map.entry(ModMenuItem.LEGACY_ARENA_GRAPH, "SHOW_GRAPH_MENU"),
+                Map.entry(ModMenuItem.PLAY_SETTINGS, "SHOW_PLAY_SETTINGS"),
+                Map.entry(ModMenuItem.SOUND_SETTINGS, "SHOW_SOUND_SETTINGS"),
+                Map.entry(ModMenuItem.DISPLAY_SETTINGS, "SHOW_DISPLAY_SETTINGS"),
                 Map.entry(ModMenuItem.MANIAC_OPTIONS, "SHOW_MANIAC_OPTIONS"));
         for (var entry : windows.entrySet()) {
             Field field = ImGuiRenderer.class.getDeclaredField(entry.getValue());

@@ -925,6 +925,10 @@ public final class BMSIRArenaClient {
                 main.getPlayerConfig(), PlayerConfig.getConfigJson(main.getPlayerConfig()));
     }
 
+    public static boolean currentBgaLoaded() {
+        return main != null && main.getCurrentState() instanceof BMSPlayer player && player.resource.getBMSResource().isBGAOn();
+    }
+
 	static LaneRenderer currentLaneRenderer(int modeId) {
 		return main != null
 				&& main.getCurrentState() instanceof BMSPlayer player

@@ -86,22 +86,12 @@ MAX values, and replays preserve their recorded interpretation.
 See [the compatibility and validation guide](docs/FORCED_LONG_NOTE_MODE.md).
 This source change does not publish a new body or plugin package.
 
-The BMS-IR settings also provide a default-off LR2-style fixed-HI-SPEED
-override. Each play mode keeps an independent base scroll value, where 100 is
-1.00x, and a reference BPM adjustable from 50 through 400 with a default of
-150. The selected legacy OFF/START/MAX/MAIN/MIN HI-SPEED FIX target supplies
-the chart BPM used by the calculation. The BMS-IR settings page can switch the
-mode being edited, and the full and compact Arena overlays can toggle the
-override and edit the current mode's base and reference values during Music
-Select. The overlays now also provide an AUTO/current-chart or explicit-mode
-editor selector and a numeric per-mode HI-SPEED change-step field from 0.00
-through 10.00. A separate numeric field edits the selected mode's actual
-HI-SPEED value from 0.01 through 20.00 and applies it to the live lane when a
-matching play is active. Both overlays also expose the global START+6/7
-lane-cover step as a labeled integer from 1 through 1000; it remains separate
-from the per-mode HI-SPEED change step. The override is disabled for NO SPEED
-constraints and is snapshotted into replays. It does not add a pseudo-FHS
-chord or an equivalent-green editor.
+The dedicated HI-SPEED tab selects Normal, LR2, or Floating independently
+for each key mode. Startup settings, the Arena overlay, and the F5 Play
+Settings window share the selection. Live switching preserves each speed
+mode's values, the chart position, and replay events. NO SPEED constraints
+and replay lane restoration lock the speed controls. BGA display can be
+toggled independently while its playback clock continues.
 
 The launcher Skin settings provide a default-on switch for the live Skin
 Select preview. Turning it off skips preview construction, reload, and render
