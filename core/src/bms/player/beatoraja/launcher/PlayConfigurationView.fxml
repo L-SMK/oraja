@@ -479,6 +479,12 @@
                             <ComboBox fx:id="screenshotFormat" prefWidth="100.0" />
                         </children>
                     </HBox>
+                    <CheckBox fx:id="screenshotSound" text="スクショ保存音 / Screenshot sound" />
+                    <HBox spacing="10">
+                        <Label text="スクショ保存音量 / Screenshot volume" />
+                        <Slider fx:id="screenshotSoundVolume" min="0" max="1" value="0.5" prefWidth="180" />
+                    </HBox>
+                    <CheckBox fx:id="replayLaneSettings" text="リプレイの表示設定を再現 / Restore replay lane settings" />
                     <Button fx:id="importScoreButton" mnemonicParsing="false" onAction="#importScoreDataFromLR2" text="%IMPORT_LR2_SCORE">
                         <VBox.margin>
                             <Insets top="10.0" />
@@ -580,6 +586,8 @@
 	                    <Label maxWidth="680.0" style="-fx-text-fill: #555555;" text="%BMSIR_TABLE_LEVEL_DISPLAY_DESCRIPTION" wrapText="true" />
 	                    <CheckBox fx:id="bmsirHideMissingTableSongs" mnemonicParsing="false" text="%BMSIR_HIDE_MISSING_TABLE_SONGS" />
 	                    <Label maxWidth="680.0" style="-fx-text-fill: #555555;" text="%BMSIR_HIDE_MISSING_TABLE_SONGS_DESCRIPTION" wrapText="true" />
+	                    <CheckBox fx:id="bmsirKeepIgnoredVisible" mnemonicParsing="false" text="%BMSIR_KEEP_IGNORED_VISIBLE" />
+	                    <Label maxWidth="680.0" style="-fx-text-fill: #555555;" text="%BMSIR_KEEP_IGNORED_VISIBLE_DESCRIPTION" wrapText="true" />
 	                    <Separator />
 	                    <Label text="%BMSIR_ARENA_TARGET_MODE" />
 	                    <ComboBox fx:id="bmsirArenaTargetMode" prefWidth="180.0" />
@@ -602,6 +610,16 @@
 	                    <HBox alignment="CENTER_LEFT" spacing="8.0">
 	                        <Label text="%MODE" />
 	                        <ComboBox fx:id="bmsirHispeedMode" onAction="#updateBmsirHispeedMode" prefWidth="180.0" />
+	                    </HBox>
+	                    <CheckBox fx:id="bmsirFloatingHispeedEnabled" mnemonicParsing="false" text="%BMSIR_FLOATING_HISPEED" />
+	                    <Label maxWidth="680.0" text="%BMSIR_FLOATING_DESCRIPTION" wrapText="true" />
+	                    <HBox alignment="CENTER_LEFT" spacing="8.0">
+	                        <Label fx:id="bmsirFloatingMultiplierLabel" text="%BMSIR_FLOATING_MULTIPLIER" />
+	                        <Spinner fx:id="bmsirFloatingHispeed" editable="true" prefWidth="110.0" />
+	                    </HBox>
+	                    <HBox alignment="CENTER_LEFT" spacing="8.0">
+	                        <Label fx:id="bmsirFloatingGreenLabel" text="%BMSIR_FLOATING_GREEN" />
+	                        <Spinner fx:id="bmsirFloatingGreen" editable="true" prefWidth="110.0" />
 	                    </HBox>
 	                    <HBox alignment="CENTER_LEFT" spacing="8.0">
 	                        <Label text="%BMSIR_BASE_SCROLL_SPEED" />

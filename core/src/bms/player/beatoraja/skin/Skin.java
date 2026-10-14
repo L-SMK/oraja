@@ -70,6 +70,7 @@ public class Skin {
 	 * 登録されているスキンオブジェクト
 	 */
 	private Array<SkinObject> objects = new Array<SkinObject>();
+	private Boolean gaugeFraction;
 	private SkinObject[] objectarray = new SkinObject[0];
 	/**
 	 * 除外されているスキンオブジェクト
@@ -133,6 +134,7 @@ public class Skin {
 
 	public void add(SkinObject object) {
 		objects.add(object);
+		gaugeFraction = null;
 	}
 
 	public void setDestination(SkinObject object, long time, float x, float y, float w, float h, int acc, int a,
@@ -159,6 +161,7 @@ public class Skin {
 		number.setDestination(time, x * dw, y * dh, w * dw, h * dh, acc, a, r, g, b, blend, filter, angle, center,
 				loop, timer, op1, op2, op3, offset);
 		objects.add(number);
+		gaugeFraction = null;
 	}
 
 	public SkinImage addImage(TextureRegion tr, long time, float x, float y, float w, float h, int acc, int a,
@@ -179,8 +182,24 @@ public class Skin {
 		return objects.toArray(SkinObject.class);
 	}
 
+	/** Whether this skin declares the legacy gauge decimal digit. Cached until objects change. */
+	public boolean hasGaugeFraction() {
+		if (gaugeFraction == null) {
+			gaugeFraction = false;
+			for (SkinObject object : objects) {
+				if (object instanceof SkinNumber number && number.usesIntegerProperty(
+						bms.player.beatoraja.skin.SkinProperty.NUMBER_GROOVEGAUGE_AFTERDOT)) {
+					gaugeFraction = true;
+					break;
+				}
+			}
+		}
+		return gaugeFraction;
+	}
+
 	public void removeSkinObject(SkinObject obj) {
 		objects.removeValue(obj, true);
+		gaugeFraction = null;
 	}
 	
 	public void prepare(MainState state) {
@@ -220,6 +239,7 @@ public class Skin {
  		}
 		logger.info("描画されないことが確定しているSkinObject削除 : {} / {}", removes.size, objects.size);
 		objects.removeAll(removes, true);
+		gaugeFraction = null;
 		objectarray = objects.toArray(SkinObject.class);
 		option.clear();
 

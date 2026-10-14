@@ -4,7 +4,6 @@ import java.util.Arrays;
 
 import bms.player.beatoraja.PlayModeConfig.KeyboardConfig;
 import bms.player.beatoraja.Resolution;
-import bms.player.beatoraja.modmenu.ArenaMenu;
 import bms.player.beatoraja.modmenu.ImGuiInputCapture;
 import bms.player.beatoraja.arena.bmsir.BMSIRArenaOverlay;
 import com.badlogic.gdx.Gdx;
@@ -27,6 +26,8 @@ public class KeyBoardInputProcesseor extends BMSPlayerInputDevice implements Inp
 			Keys.CONTROL_LEFT, Keys.COMMA, Keys.L, Keys.PERIOD, Keys.SEMICOLON, Keys.SLASH, Keys.APOSTROPHE,
 			Keys.BACKSLASH, Keys.SHIFT_RIGHT, Keys.CONTROL_RIGHT };
 	private int[] control = new int[] { Keys.Q, Keys.W };
+    private int[][] bindings = new int[0][];
+    private boolean[] logicalHeld = new boolean[0];
 
 	private MouseScratchInput mouseScratchInput;
 
@@ -73,10 +74,14 @@ public class KeyBoardInputProcesseor extends BMSPlayerInputDevice implements Inp
 		Arrays.fill(keytime, Long.MIN_VALUE);
 	}
 
-	public void setConfig(KeyboardConfig config) {
+	public void setConfig(KeyboardConfig config) { setConfig(config, false); }
+    public void setConfig(KeyboardConfig config, boolean multi) {
+        if (bindings.length > 0) bmsPlayerInputProcessor.releaseSource(this);
 		this.keys = config.getKeyAssign().clone();
 		this.duration = config.getDuration();
 		this.control = new int[] { config.getStart(), config.getSelect() };
+        bindings = MultiInputBindings.resolve(keys, control[0], control[1], config.getAdditionalBindings(), multi);
+        logicalHeld = new boolean[bindings.length];
 		mouseScratchInput.setConfig(config);
 	}
 
@@ -97,12 +102,12 @@ public class KeyBoardInputProcesseor extends BMSPlayerInputDevice implements Inp
 		// Arrays.fill(keystate, false);
 		Arrays.fill(keytime, Long.MIN_VALUE);
 		lastPressedKey = -1;
+        // Clearing timestamps at PLAY start must preserve held evidence until key-up.
 		mouseScratchInput.clear();
 	}
 
 	public synchronized void poll(final long microtime) {
-		boolean captureRequested = ArenaMenu.isFocused
-				|| BMSIRArenaOverlay.isHotkeyCaptureActive()
+		boolean captureRequested = BMSIRArenaOverlay.isHotkeyCaptureActive()
 				|| ImGuiInputCapture.isKeyboardCaptured();
 		if (captureRequested) {
 			keyboardCaptureActive = true;
@@ -112,29 +117,30 @@ public class KeyBoardInputProcesseor extends BMSPlayerInputDevice implements Inp
 			keyboardCaptureActive = false;
 		}
 		if (acceptInput && !textmode) {
-			for (int i = 0; i < keys.length; i++) {
-				if(keys[i] < 0) {
-					continue;
-				}
-				final boolean pressed = Gdx.input.isKeyPressed(keys[i]);
-				if (pressed != keystate[keys[i]] && microtime >= keytime[keys[i]] + duration * 1000) {
-					keystate[keys[i]] = pressed;
-					keytime[keys[i]] = microtime;
-					this.bmsPlayerInputProcessor.keyChanged(this, microtime, i, pressed);
-					this.bmsPlayerInputProcessor.setAnalogState(i, false, 0);
-				}
-			}
-
-			final boolean startpressed = Gdx.input.isKeyPressed(control[0]);
-			if (startpressed != keystate[control[0]]) {
-				keystate[control[0]] = startpressed;
-				this.bmsPlayerInputProcessor.startChanged(startpressed);
-			}
-			final boolean selectpressed = Gdx.input.isKeyPressed(control[1]);
-			if (selectpressed != keystate[control[1]]) {
-				keystate[control[1]] = selectpressed;
-				this.bmsPlayerInputProcessor.setSelectPressed(selectpressed);
-			}
+            // Update all physical states before OR-ing aliases, avoiding false release/press pairs.
+            boolean[] visited = new boolean[keystate.length];
+            for (int index = 0; index < bindings.length; index++) {
+                for (int code : bindings[index]) {
+                    if (visited[code]) continue;
+                    visited[code] = true;
+                    boolean pressed = Gdx.input.isKeyPressed(code);
+                    if (pressed != keystate[code] && (index >= keys.length
+                            || microtime >= keytime[code] + duration * 1000L)) {
+                        keystate[code] = pressed;
+                        keytime[code] = microtime;
+                    }
+                }
+            }
+            for (int index = 0; index < bindings.length; index++) {
+                boolean held = MultiInputBindings.pressed(bindings[index], keystate);
+                if (held == logicalHeld[index]) continue;
+                logicalHeld[index] = held;
+                if (index < keys.length) {
+                    bmsPlayerInputProcessor.keyChanged(this, microtime, index, held);
+                    bmsPlayerInputProcessor.setAnalogState(index, false, 0);
+                } else if (index == keys.length) bmsPlayerInputProcessor.startChanged(this, held);
+                else bmsPlayerInputProcessor.selectChanged(this, held);
+            }
 		} else if (!acceptInput) {
 			releaseCapturedKeys(microtime);
 		}
@@ -156,23 +162,18 @@ public class KeyBoardInputProcesseor extends BMSPlayerInputDevice implements Inp
 	}
 
 	public synchronized void releaseCapturedKeys(long microtime) {
-		for (int index = 0; index < keys.length; index++) {
-			int keycode = keys[index];
-			if (keycode >= 0 && keystate[keycode]) {
-				keystate[keycode] = false;
-				keytime[keycode] = microtime;
-				bmsPlayerInputProcessor.keyChanged(this, microtime, index, false);
-				bmsPlayerInputProcessor.setAnalogState(index, false, 0);
-			}
-		}
-		if (keystate[control[0]]) {
-			keystate[control[0]] = false;
-			bmsPlayerInputProcessor.startChanged(false);
-		}
-		if (keystate[control[1]]) {
-			keystate[control[1]] = false;
-			bmsPlayerInputProcessor.setSelectPressed(false);
-		}
+        for (int index = 0; index < bindings.length; index++) {
+            for (int code : bindings[index]) {
+                keystate[code] = false;
+                keytime[code] = microtime;
+            }
+            logicalHeld[index] = false;
+            if (index < keys.length) {
+                bmsPlayerInputProcessor.keyChanged(this, microtime, index, false);
+                bmsPlayerInputProcessor.setAnalogState(index, false, 0);
+            } else if (index == keys.length) bmsPlayerInputProcessor.startChanged(this, false);
+            else bmsPlayerInputProcessor.selectChanged(this, false);
+        }
 		for (ControlKeys key : ControlKeys.values()) {
 			keystate[key.keycode] = false;
 			keytime[key.keycode] = Long.MIN_VALUE;
@@ -189,39 +190,21 @@ public class KeyBoardInputProcesseor extends BMSPlayerInputDevice implements Inp
 		mouseScratchInput.releaseCapturedInput(microtime);
 	}
 
-	boolean isPhysicalKeyPressed(int index) {
-		return index >= 0
-				&& index < keys.length
-				&& keys[index] >= 0
-				&& Gdx.input.isKeyPressed(keys[index]);
-	}
-
-	boolean isPhysicalStartPressed() {
-		return control[0] >= 0 && Gdx.input.isKeyPressed(control[0]);
-	}
-
-	boolean isPhysicalSelectPressed() {
-		return control[1] >= 0 && Gdx.input.isKeyPressed(control[1]);
-	}
-
-	private boolean capturedKeysReleased() {
-		for (int keycode : keys) {
-			if (keycode >= 0 && Gdx.input.isKeyPressed(keycode)) {
-				return false;
-			}
-		}
-		for (int keycode : control) {
-			if (keycode >= 0 && Gdx.input.isKeyPressed(keycode)) {
-				return false;
-			}
-		}
-		for (ControlKeys key : ControlKeys.values()) {
-			if (Gdx.input.isKeyPressed(key.keycode)) {
-				return false;
-			}
-		}
-		return true;
-	}
+    boolean isPhysicalKeyPressed(int index) {
+        if (index < 0 || index >= keys.length) return false;
+        return anyPhysicalPressed(bindings[index]);
+    }
+    boolean isPhysicalStartPressed() { return anyPhysicalPressed(bindings[keys.length]); }
+    boolean isPhysicalSelectPressed() { return anyPhysicalPressed(bindings[keys.length + 1]); }
+    private boolean anyPhysicalPressed(int[] codes) {
+        for (int code : codes) if (Gdx.input.isKeyPressed(code)) return true;
+        return false;
+    }
+    private boolean capturedKeysReleased() {
+        for (int[] codes : bindings) if (anyPhysicalPressed(codes)) return false;
+        for (ControlKeys key : ControlKeys.values()) if (Gdx.input.isKeyPressed(key.keycode)) return false;
+        return true;
+    }
 
 	private int currentlyHeldModifiers() {
 		boolean shift = Gdx.input.isKeyPressed(Keys.SHIFT_LEFT) || Gdx.input.isKeyPressed(Keys.SHIFT_RIGHT);

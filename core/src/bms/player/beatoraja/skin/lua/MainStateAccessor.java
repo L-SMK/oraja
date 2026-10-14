@@ -331,10 +331,12 @@ public class MainStateAccessor {
 	 * NOTE: 呼び出しの度にIntegerPropertyを生成しており効率が悪いため非推奨
 	 */
 	private class number extends OneArgFunction {
+		private final SkinLuaValueCache values = new SkinLuaValueCache(128);
 		@Override
 		public LuaValue call(LuaValue luaValue) {
-			IntegerProperty prop = IntegerPropertyFactory.getIntegerProperty(luaValue.toint());
-			return LuaNumber.valueOf(prop.get(state));
+			int id = luaValue.toint();
+			IntegerProperty prop = IntegerPropertyFactory.getIntegerProperty(id);
+			return values.number(id, prop.get(state));
 		}
 	}
 
@@ -343,10 +345,12 @@ public class MainStateAccessor {
 	 * NOTE: 呼び出しの度にFloatPropertyを生成しており効率が悪いため非推奨
 	 */
 	private class float_number extends OneArgFunction {
+		private final SkinLuaValueCache values = new SkinLuaValueCache(128);
 		@Override
 		public LuaValue call(LuaValue luaValue) {
-			FloatProperty prop = FloatPropertyFactory.getRateProperty(luaValue.toint());
-			return LuaDouble.valueOf(prop.get(state));
+			int id = luaValue.toint();
+			FloatProperty prop = FloatPropertyFactory.getRateProperty(id);
+			return values.number(id, prop.get(state));
 		}
 	}
 
@@ -355,10 +359,11 @@ public class MainStateAccessor {
 	 * NOTE: 呼び出しの度にStringPropertyを生成しており効率が悪いため非推奨
 	 */
 	private class text extends OneArgFunction {
+		private final SkinLuaTextCache values = new SkinLuaTextCache();
 		@Override
 		public LuaValue call(LuaValue luaValue) {
 			StringProperty prop = StringPropertyFactory.getStringProperty(luaValue.toint());
-			return LuaString.valueOf(prop.get(state));
+			return values.valueOf(prop.get(state));
 		}
 	}
 
@@ -385,9 +390,11 @@ public class MainStateAccessor {
 	 * return: ONになった時刻 (micro sec) | timer_off_value (OFFのとき)
 	 */
 	private class timer extends OneArgFunction {
+		private final SkinLuaValueCache values = new SkinLuaValueCache(128);
 		@Override
 		public LuaValue call(LuaValue value) {
-			return LuaNumber.valueOf(state.timer.getMicroTimer(value.toint()));
+			int id = value.toint();
+			return values.number(id, state.timer.getMicroTimer(id));
 		}
 	}
 
@@ -401,9 +408,10 @@ public class MainStateAccessor {
 	 * return: 時刻 (micro sec)
 	 */
 	private class time extends ZeroArgFunction {
+		private final SkinLuaValueCache values = new SkinLuaValueCache(1);
 		@Override
 		public LuaValue call() {
-			return LuaNumber.valueOf(state.timer.getNowMicroTime());
+			return values.number(0, state.timer.getNowMicroTime());
 		}
 	}
 

@@ -1,5 +1,6 @@
 package bms.player.beatoraja;
 
+import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -10,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import bms.player.beatoraja.exceptions.PlayerConfigException;
+import bms.player.beatoraja.generated.AudioChartSession;
 import bms.player.beatoraja.arena.bmsir.BMSIRArenaClient;
 import bms.player.beatoraja.arena.bmsir.BMSIRArenaI18n;
 import bms.player.beatoraja.arena.bmsir.BMSIRArenaOverlay;
@@ -122,6 +124,9 @@ public class MainController {
 	private final PersistentRankingDataStore persistentRankingDataStore = new PersistentRankingDataStore();
 
 	private SpriteBatch sprite;
+    private bms.player.beatoraja.camera.HandCameraManager handCameraManager;
+
+    public bms.player.beatoraja.camera.HandCameraManager getHandCameraManager() { return handCameraManager; }
 	/**
 	 * 1曲プレイで指定したBMSファイル
 	 */
@@ -614,6 +619,7 @@ public class MainController {
 			}
 			break;
 		case DECIDE:
+            resource.setOrgGaugeOption(player.getGauge());
 			if (config.isSkipDecideScreen()) {
 				judgeTimingRestore.begin(player);
 				newState = createBMSPlayerState();
@@ -712,7 +718,7 @@ public class MainController {
 		}
 	}
 
-	private void executeBmsirNumpadAction(BMSIRNumpadAction action) {
+	public void executeBmsirNumpadAction(BMSIRNumpadAction action) {
 		switch (action) {
 		case JUDGE_AUTO:
 			if (current instanceof BMSPlayer) {
@@ -783,6 +789,19 @@ public class MainController {
 				PlayerConfig.JUDGETIMING_MIN,
 				Math.min(PlayerConfig.JUDGETIMING_MAX, player.getJudgetiming() + delta)
 		));
+	}
+
+	public void shareScreenshot() {
+		if (screenshot == null || !screenshot.isAlive()) {
+			final MainState screenshotState = current;
+			final byte[] pixels = ScreenUtils.getFrameBufferPixels(0, 0,
+					Gdx.graphics.getBackBufferWidth(), Gdx.graphics.getBackBufferHeight(), false);
+			screenshot = new Thread(() -> {
+				for (int i = 3; i < pixels.length; i += 4) pixels[i] = (byte) 0xff;
+				new ScreenShotTwitterExporter(player).send(screenshotState, pixels);
+			});
+			screenshot.start();
+		}
 	}
 
 	private void toggleScreenMode() {
@@ -867,6 +886,7 @@ public class MainController {
 		if (screenshot != null && screenshot.isAlive()) {
 			return;
 		}
+		final MainState screenshotState = current;
 		final byte[] pixels = ScreenUtils.getFrameBufferPixels(
 				0,
 				0,
@@ -878,7 +898,13 @@ public class MainController {
 			for (int index = 3; index < pixels.length; index += 4) {
 				pixels[index] = (byte) 0xff;
 			}
-			new ScreenShotFileExporter().send(current, pixels);
+            boolean saved = new ScreenShotFileExporter().send(screenshotState, pixels);
+            if (saved && config.isScreenshotSound()) {
+                Gdx.app.postRunnable(() -> {
+                    if (sound != null) sound.play(SystemSoundManager.SoundType.SCREENSHOT, false,
+                            config.getScreenshotSoundVolume());
+                });
+            }
 		});
 		screenshot.start();
 		saveLastRecording("ON_SCREENSHOT");
@@ -1124,6 +1150,7 @@ public class MainController {
 		SongManagerMenu.injectMusicSelector(selector);
 		ArenaMenu.init(resource.getPlayerConfig().getName(), selector);
 		MiscSettingMenu.setMain(this);
+		FunctionKeyMenu.setMain(this);
 		if (initializeArena) {
 			BMSIRArenaClient.initialize(this);
 		}
@@ -1160,6 +1187,8 @@ public class MainController {
 	public void render() {
 //		input.poll();
 		timer.update();
+        if (handCameraManager == null) handCameraManager = new bms.player.beatoraja.camera.HandCameraManager(config);
+        handCameraManager.beginFrame();
 
 		Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
@@ -1170,6 +1199,8 @@ public class MainController {
 			current.getSkin().drawAllObjects(sprite, current);
 		}
 		sprite.end();
+
+        handCameraManager.endFrame();
 
 		final Stage stage = current.getStage();
 		if (stage != null) {
@@ -1334,17 +1365,7 @@ public class MainController {
             }
 
             if (input.isActivated(KeyCommand.POST_TWITTER)) {
-                if (screenshot == null || !screenshot.isAlive()) {
-            		final byte[] pixels = ScreenUtils.getFrameBufferPixels(0, 0, Gdx.graphics.getBackBufferWidth(),Gdx.graphics.getBackBufferHeight(), false);
-                    screenshot = new Thread(() -> {
-                		// 全ピクセルのアルファ値を255にする(=透明色を無くす)
-                		for(int i = 3;i < pixels.length;i+=4) {
-                			pixels[i] = (byte) 0xff;
-                		}
-                    	new ScreenShotTwitterExporter(player).send(current, pixels);
-                    });
-                    screenshot.start();
-                }
+                shareScreenshot();
             }
 
 			if (input.isActivated(KeyCommand.TOGGLE_MOD_MENU)) {
@@ -1377,6 +1398,7 @@ public class MainController {
 
 	public void dispose() {
 		BMSIRArenaClient.shutdown();
+        if (handCameraManager != null) handCameraManager.close();
 		judgeTimingRestore.restore(player);
 		saveConfig();
 
@@ -1424,6 +1446,7 @@ public class MainController {
 	}
 
 	public void pause() {
+        if (handCameraManager != null) handCameraManager.suspend();
 		current.pause();
 	}
 
@@ -1603,9 +1626,37 @@ public class MainController {
 	private volatile UpdateThread updateSong;
 	private SongUpdateRequestQueue.Request activeSongUpdateRequest;
 
-	/** Handles loose chart files dropped onto the game window. */
+	/** A single dropped audio file starts chart generation instead of a chart import. */
+	static Path droppedAudioFile(String[] files) {
+		if (files.length != 1) {
+			return null;
+		}
+		try {
+			Path path = Paths.get(files[0]);
+			return AudioChartSession.isSupportedFile(path) && Files.isRegularFile(path) ? path : null;
+		} catch (InvalidPathException exception) {
+			return null;
+		}
+	}
+
+	/** Handles loose chart files and audio files dropped onto the game window. */
 	public void handleFilesDropped(String[] files) {
 		if (files == null || files.length == 0) {
+			return;
+		}
+		Path droppedAudio = droppedAudioFile(files);
+		if (droppedAudio != null) {
+			if (selector == null || current != selector) {
+				ImGuiNotify.warning(BMSIRArenaI18n.text(
+						"音源からの譜面生成は選曲画面でのみ使用できます",
+						"Charts from audio can only be generated in Music Select"), 5000);
+			} else if (BMSIRArenaClient.isNominationOpen() || BMSIRArenaClient.isSelectionBlocked()) {
+				ImGuiNotify.warning(BMSIRArenaI18n.text(
+						"Arenaの対戦準備中は音源から譜面を生成できません",
+						"Charts from audio cannot be generated while Arena is preparing a match"), 5000);
+			} else {
+				AudioChartSession.start(droppedAudio);
+			}
 			return;
 		}
 		if (selector == null || current != selector) {

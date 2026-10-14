@@ -79,6 +79,8 @@ public class KeyConfiguration extends MainState {
 	private int cursorpos = 0;
 	private int scrollpos = 0;
 	private boolean keyinput = false;
+    private boolean appendBinding;
+    private int aliasDisplayDevice;
 
 	private int mode = 0;
 
@@ -155,16 +157,21 @@ public class KeyConfiguration extends MainState {
 		Gdx.gl.glClearColor(0, 0, 0, 1);
 		Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-		if (input.isControlKeyPressed(ControlKeys.LEFT)) {
+		if (!keyinput && input.isControlKeyPressed(ControlKeys.LEFT)) {
 			setMode((mode + KEYS.length - 1) % KEYS.length);
 		}
-		if (input.isControlKeyPressed(ControlKeys.RIGHT)) {
+		if (!keyinput && input.isControlKeyPressed(ControlKeys.RIGHT)) {
 			setMode((mode + 1) % KEYS.length);
 		}
 
 		String[] keys = KEYS[mode];
 		int[] keysa = KEYSA[mode];
 
+        if (keyinput && keyboard.getLastPressedKey() == Keys.ESCAPE) {
+            keyinput = false;
+            keyboard.discardKeyPress(Keys.ESCAPE);
+            keyboard.setLastPressedKey(-1);
+        }
 		if (keyinput) {
 			if (keyinput && input.getKeyBoardInputProcesseor().getLastPressedKey() != -1) {
 				setKeyboardKeyAssign(keysa[cursorpos]);
@@ -172,9 +179,8 @@ public class KeyConfiguration extends MainState {
 				keyinput = false;
 			}
 			if (keyinput && input.getKeyBoardInputProcesseor().getMouseScratchInput().getLastMouseScratch() != -1) {
-				setMouseScratchKeyAssign(keysa[cursorpos], input.getKeyBoardInputProcesseor());
-				// System.out.println(input.getKeyBoardInputProcesseor().getLastMouseScratch());
-				keyinput = false;
+                keyinput = !setMouseScratchKeyAssign(keysa[cursorpos], input.getKeyBoardInputProcesseor());
+                input.getKeyBoardInputProcesseor().getMouseScratchInput().setLastMouseScratch(-1);
 			}
 			for (BMControllerInputProcessor bmc : controllers) {
 				if (keyinput && bmc.getLastPressedButton() != -1) {
@@ -192,6 +198,14 @@ public class KeyConfiguration extends MainState {
 				deletepressed = true;
 			}
 		} else {
+            if (input.isControlKeyPressed(ControlKeys.NUM0)) aliasDisplayDevice = (aliasDisplayDevice + 1) % (controllerConfigs.length + 2);
+            if (input.isControlKeyPressed(ControlKeys.NUM4)) pc.setMultiInputEnabled(!pc.isMultiInputEnabled());
+            if (input.isControlKeyPressed(ControlKeys.NUM5)) {
+                pc.setMultiInputEnabled(true);
+                setKeyAssignMode(cursorpos);
+                appendBinding = true;
+            }
+            if (input.isControlKeyPressed(ControlKeys.NUM6)) clearAdditional(KEYSA[mode][cursorpos]);
 			if (input.isControlKeyPressed(ControlKeys.UP)) {
 				cursorpos = (cursorpos + keys.length - 1) % keys.length;
 			}
@@ -288,10 +302,19 @@ public class KeyConfiguration extends MainState {
 				titlefont.setColor(Color.YELLOW);
 				titlefont.draw(sprite, "Controller2", 480 * scaleX, 620 * scaleY);
 				titlefont.setColor(Color.ORANGE);
-				titlefont.draw(sprite, "Controller Device 2 (press [3] to change) :   ", 750 * scaleX, 300 * scaleY);
-				titlefont.draw(sprite, pc.getController()[1].getName(), 780 * scaleX, 270 * scaleY);
+				titlefont.draw(sprite, "Controller Device 2 (press [3] to change) :   ", 750 * scaleX, 340 * scaleY);
+				titlefont.draw(sprite, pc.getController()[1].getName(), 780 * scaleX, 310 * scaleY);
 			}
 
+            titlefont.draw(sprite, "[4] Multiple inputs: " + (pc.isMultiInputEnabled() ? "ON" : "OFF"), 750 * scaleX, 240 * scaleY);
+            titlefont.draw(sprite, "[5] Add input / [6] Clear added inputs", 750 * scaleX, 210 * scaleY);
+            titlefont.draw(sprite, "ENTER replaces / DEL clears selected binding", 750 * scaleX, 180 * scaleY);
+            int selected = KEYSA[mode][cursorpos];
+            titlefont.setColor(Color.WHITE);
+            titlefont.draw(sprite, "Added inputs [0] next device: " + KEYS[mode][cursorpos], 750 * scaleX, 455 * scaleY);
+            titlefont.draw(sprite, addedDetails(selected), 750 * scaleX, 430 * scaleY,
+                    470 * scaleX, com.badlogic.gdx.utils.Align.left, true);
+            titlefont.setColor(Color.ORANGE);
 			titlefont.draw(sprite, "[7] Restore to Default (Keyboard)", 750 * scaleX, 150 * scaleY);
 			titlefont.draw(sprite, "[8] Restore to Default (Controller)", 750 * scaleX, 120 * scaleY);
 			titlefont.draw(sprite, "[9] Restore to Default (MIDI)", 750 * scaleX, 90 * scaleY);			
@@ -318,17 +341,17 @@ public class KeyConfiguration extends MainState {
 				titlefont.setColor(Color.WHITE);
 				titlefont.draw(sprite, keys[i], 50 * scaleX, (y + 22) * scaleY);
 				titlefont.draw(sprite, getMouseScratchKeyString(keysa[i], getKeyboardKeyAssign(keysa[i]) != -1 ? 
-					Keys.toString(getKeyboardKeyAssign(keysa[i])) : "----"), 202 * scaleX, (y + 22) * scaleY);
+					Keys.toString(getKeyboardKeyAssign(keysa[i])) : "----") + addedLabel(keyboardConfig.getAdditionalBindings(), keysa[i]), 202 * scaleX, (y + 22) * scaleY);
 				titlefont.draw(sprite, getControllerKeyAssign(0, keysa[i]) != -1
-						? BMControllerInputProcessor.BMKeys.toString(getControllerKeyAssign(0, keysa[i])) : "----",
+						? BMControllerInputProcessor.BMKeys.toString(getControllerKeyAssign(0, keysa[i])) + addedLabel(controllerConfigs[0].getAdditionalBindings(), keysa[i]) : "----" + addedLabel(controllerConfigs[0].getAdditionalBindings(), keysa[i]),
 						352 * scaleX, (y + 22) * scaleY);
 				if (pc.getController().length > 1) {
 					titlefont.draw(sprite, getControllerKeyAssign(1, keysa[i]) != -1 ?
-							BMControllerInputProcessor.BMKeys.toString(getControllerKeyAssign(1, keysa[i])) : "----", 502 * scaleX,
+							BMControllerInputProcessor.BMKeys.toString(getControllerKeyAssign(1, keysa[i])) + addedLabel(controllerConfigs[1].getAdditionalBindings(), keysa[i]) : "----" + addedLabel(controllerConfigs[1].getAdditionalBindings(), keysa[i]), 502 * scaleX,
 							(y + 22) * scaleY);
 				}
 				titlefont.draw(sprite,
-						getMidiKeyAssign(keysa[i]) != null ? getMidiKeyAssign(keysa[i]).toString() : "----",
+						(getMidiKeyAssign(keysa[i]) != null ? getMidiKeyAssign(keysa[i]).toString() : "----") + addedLabel(midiconfig.getAdditionalBindings(), keysa[i]),
 						652 * scaleX, (y + 22) * scaleY);				
 			}
 			sprite.end();
@@ -344,6 +367,7 @@ public class KeyConfiguration extends MainState {
 		midiinput.clearLastPressedKey();
 		cursorpos = index;
 		keyinput = true;
+        appendBinding = false;
 	}
 	/**
 	 * キーインデックスに対応するキーの文字列を返す
@@ -419,8 +443,10 @@ public class KeyConfiguration extends MainState {
 
 	private void setKeyboardKeyAssign(int index) {
 		if (keyboard.isReservedKey(keyboard.getLastPressedKey())) {
+            bms.player.beatoraja.modmenu.ImGuiNotify.warning("固定操作用の予約キーです / Key reserved for fixed controls");
 			return;
 		}
+        if (appendBinding && appendKeyboard(index, keyboard.getLastPressedKey())) return;
 		resetKeyAssign(index);
 		if (index >= 0) {
 			keyboardConfig.getKeyAssign()[index] = keyboard.getLastPressedKey();
@@ -451,9 +477,13 @@ public class KeyConfiguration extends MainState {
 		}
 	}
 
-	private void setMouseScratchKeyAssign(int index, KeyBoardInputProcesseor kbp) {
-		resetKeyAssign(index);
-		int lastMouseScratch = kbp.getMouseScratchInput().getLastMouseScratch();
+    private boolean setMouseScratchKeyAssign(int index, KeyBoardInputProcesseor kbp) {
+        if (appendBinding) {
+            bms.player.beatoraja.modmenu.ImGuiNotify.warning("追加するキー・ボタン・MIDI入力を押してください / Add a keyboard, controller or MIDI input");
+            return false;
+        }
+        resetKeyAssign(index);
+        int lastMouseScratch = kbp.getMouseScratchInput().getLastMouseScratch();
 		if (index >= 0) {
 			keyboardConfig.getMouseScratchConfig().getKeyAssign()[index] = lastMouseScratch;
 		} else if (index == -1) {
@@ -463,7 +493,8 @@ public class KeyConfiguration extends MainState {
 		} else if (index == -3) {
 			keyboardConfig.getMouseScratchConfig().setDiffFilter(lastMouseScratch);
 		}
-	}
+        return true;
+    }
 
 	private int getControllerKeyAssign(int device, int index) {
 		if (index >= 0) {
@@ -490,6 +521,15 @@ public class KeyConfiguration extends MainState {
 			return;
 		}
 
+        if (appendBinding && index != -3) {
+            ControllerConfig controller = controllerConfigs[cindex];
+            if (bindingExists(controller.getKeyAssign(), controller.getStart(), controller.getSelect(), controller.getDiffFilter(),
+                    controller.getAdditionalBindings(), bmc.getLastPressedButton())) return;
+            controller.setAdditionalBindings(bms.player.beatoraja.input.MultiInputBindings.add(controller.getAdditionalBindings(),
+                    controller.getKeyAssign().length + 2, bindingIndex(index), bmc.getLastPressedButton()));
+            pc.validate(keyboardConfig.getKeyAssign().length);
+            return;
+        }
 		resetKeyAssign(index);
 		if (index >= 0) {
 			controllerConfigs[cindex].getKeyAssign()[index] = bmc.getLastPressedButton();
@@ -516,6 +556,7 @@ public class KeyConfiguration extends MainState {
 	}
 
 	private void resetKeyAssign(int index) {
+        clearAdditional(index);
 		if (index >= 0) {
 			keyboardConfig.getKeyAssign()[index] = -1;
 			for (ControllerConfig cc : controllerConfigs) {
@@ -523,6 +564,14 @@ public class KeyConfiguration extends MainState {
 			}
 			keyboardConfig.getMouseScratchConfig().getKeyAssign()[index] = -1;
 			midiconfig.setKeyAssign(index, null);
+        } else if (index == -1 || index == -2) {
+            if (index == -1) keyboardConfig.setStart(-1); else keyboardConfig.setSelect(-1);
+            for (ControllerConfig controller : controllerConfigs) {
+                if (index == -1) controller.setStart(-1); else controller.setSelect(-1);
+            }
+            if (index == -1) midiconfig.setStart(null); else midiconfig.setSelect(null);
+            if (index == -1) keyboardConfig.getMouseScratchConfig().setStart(-1);
+            else keyboardConfig.getMouseScratchConfig().setSelect(-1);
 		} else if (index == -3) {
 			keyboardConfig.setDiffFilter(-1);
 			keyboardConfig.getMouseScratchConfig().setDiffFilter(-1);
@@ -534,7 +583,10 @@ public class KeyConfiguration extends MainState {
 	}
 
 	private void deleteKeyAssign(int index) {
+        clearAdditional(index);
 		final int noAssign = -1;
+        if (index == -1) keyboardConfig.setStart(-1);
+        if (index == -2) keyboardConfig.setSelect(-1);
 		if (index >= 0) keyboardConfig.getKeyAssign()[index] = noAssign;
 		if(index >= 0) {
 			keyboardConfig.getMouseScratchConfig().getKeyAssign()[index] = noAssign;
@@ -565,6 +617,26 @@ public class KeyConfiguration extends MainState {
 	}
 
 	private void setMidiKeyAssign(int index) {
+        if (appendBinding && index != -3) {
+            MidiConfig.Input binding = new MidiConfig.Input(midiinput.getLastPressedKey());
+            for (MidiConfig.Input existing : midiconfig.getKeys()) if (sameMidi(existing, binding)) return;
+            for (MidiConfig.Input existing : new MidiConfig.Input[]{midiconfig.getStart(), midiconfig.getSelect(), midiconfig.getDiffFilter()}) {
+                if (sameMidi(existing, binding)) return;
+            }
+            MidiConfig.Input[][] old = midiconfig.getAdditionalBindings();
+            MidiConfig.Input[][] extra = new MidiConfig.Input[keyboardConfig.getKeyAssign().length + 2][];
+            for (int row = 0; row < extra.length; row++) {
+                extra[row] = old != null && row < old.length && old[row] != null ? old[row].clone() : new MidiConfig.Input[0];
+                for (MidiConfig.Input existing : extra[row]) if (sameMidi(existing, binding)) return;
+            }
+            int slot = bindingIndex(index);
+            if (extra[slot].length >= bms.player.beatoraja.input.MultiInputBindings.MAX_ADDITIONAL) return;
+            extra[slot] = java.util.Arrays.copyOf(extra[slot], extra[slot].length + 1);
+            extra[slot][extra[slot].length - 1] = binding;
+            midiconfig.setAdditionalBindings(extra);
+            pc.validate(keyboardConfig.getKeyAssign().length);
+            return;
+        }
 		resetKeyAssign(index);
 		if (index >= 0) {
 			midiconfig.setKeyAssign(index, midiinput.getLastPressedKey());
@@ -576,6 +648,72 @@ public class KeyConfiguration extends MainState {
 			midiconfig.setDiffFilter(midiinput.getLastPressedKey());
 		}
 	}
+
+    private String addedDetails(int index) {
+        if (index == -3) return "No additional bindings for difficulty filter";
+        int slot = bindingIndex(index);
+        int device = aliasDisplayDevice % (controllerConfigs.length + 2);
+        java.util.ArrayList<String> labels = new java.util.ArrayList<>();
+        String name;
+        if (device == 0) {
+            name = "Keyboard";
+            int[][] extra = keyboardConfig.getAdditionalBindings();
+            if (extra != null && slot < extra.length && extra[slot] != null) for (int code : extra[slot]) labels.add(Keys.toString(code));
+        } else if (device <= controllerConfigs.length) {
+            name = "Controller " + device;
+            int[][] extra = controllerConfigs[device - 1].getAdditionalBindings();
+            if (extra != null && slot < extra.length && extra[slot] != null) for (int code : extra[slot]) labels.add(BMControllerInputProcessor.BMKeys.toString(code));
+        } else {
+            name = "MIDI";
+            MidiConfig.Input[][] extra = midiconfig.getAdditionalBindings();
+            if (extra != null && slot < extra.length && extra[slot] != null) for (MidiConfig.Input code : extra[slot]) labels.add(code.toString());
+        }
+        return name + ": " + (labels.isEmpty() ? "None" : String.join(" / ", labels));
+    }
+    private int bindingIndex(int index) {
+        return index >= 0 ? index : keyboardConfig.getKeyAssign().length + (index == -2 ? 1 : 0);
+    }
+    private String addedLabel(Object[] extra, int index) {
+        if (index == -3 || extra == null || bindingIndex(index) >= extra.length) return "";
+        Object row = extra[bindingIndex(index)];
+        int count = row == null ? 0 : java.lang.reflect.Array.getLength(row);
+        return count == 0 ? "" : " +" + count;
+    }
+    private void clearAdditional(int index) {
+        if (index == -3) return;
+        int slot = bindingIndex(index);
+        clearRow(keyboardConfig.getAdditionalBindings(), slot);
+        for (ControllerConfig controller : controllerConfigs) clearRow(controller.getAdditionalBindings(), slot);
+        clearRow(midiconfig.getAdditionalBindings(), slot);
+    }
+    private static void clearRow(Object[] rows, int index) {
+        if (rows != null && index < rows.length && rows[index] != null) {
+            rows[index] = java.lang.reflect.Array.newInstance(rows[index].getClass().getComponentType(), 0);
+        }
+    }
+    private boolean appendKeyboard(int index, int code) {
+        if (index == -3) return false;
+        if (bindingExists(keyboardConfig.getKeyAssign(), keyboardConfig.getStart(), keyboardConfig.getSelect(),
+                keyboardConfig.getDiffFilter(), keyboardConfig.getAdditionalBindings(), code)) return true;
+        keyboardConfig.setAdditionalBindings(bms.player.beatoraja.input.MultiInputBindings.add(keyboardConfig.getAdditionalBindings(),
+                keyboardConfig.getKeyAssign().length + 2, bindingIndex(index), code));
+        pc.validate(keyboardConfig.getKeyAssign().length);
+        return true;
+    }
+    private static boolean bindingExists(int[] keys, int start, int select, int filter, int[][] extra, int code) {
+        if (java.util.Arrays.stream(keys).anyMatch(key -> key == code) || start == code || select == code || filter == code) {
+            bms.player.beatoraja.modmenu.ImGuiNotify.warning("その入力は既に割当済みです / Input already assigned");
+            return true;
+        }
+        if (extra != null) for (int[] row : extra) if (row != null) for (int key : row) if (key == code) {
+            bms.player.beatoraja.modmenu.ImGuiNotify.warning("その入力は既に割当済みです / Input already assigned");
+            return true;
+        }
+        return false;
+    }
+    private static boolean sameMidi(MidiConfig.Input first, MidiConfig.Input second) {
+        return first != null && second != null && first.type == second.type && first.value == second.value;
+    }
 
 	private void validateKeyboardLength() {
 		int maxKey = 0;

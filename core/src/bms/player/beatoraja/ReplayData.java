@@ -39,6 +39,8 @@ public final class ReplayData implements Validatable {
 	 * モード
 	 */
 	public int mode;
+    /** Missing in old files means the historical BMS parser, never an inferred migration. */
+    public int bmsirParserRevision = 1;
 	/** Missing in older replays: retain the chart-authored LN interpretation. */
 	public boolean bmsirForcedLongNotes;
 	/**
@@ -117,6 +119,8 @@ public final class ReplayData implements Validatable {
 	 * プレイコンフィグ
 	 */
 	public PlayConfig config;
+    public int laneStateVersion;
+    public ReplayLaneState[] laneStates;
 	
 	public void shrink() {
 		if (keylog.length == 0) return;
@@ -140,6 +144,7 @@ public final class ReplayData implements Validatable {
 	@Override
 	public boolean validate() {
 		if (bmsirForcedLongNotes && (mode < 0 || mode > 2)) return false;
+        if (bmsirParserRevision < 1 || bmsirParserRevision > BMSIRParserCompatibility.CURRENT_REVISION) return false;
 		if (keyinput != null) {
 			try {
 				InputStream input = new ByteArrayInputStream(keyinput.getBytes());
@@ -180,6 +185,19 @@ public final class ReplayData implements Validatable {
 				return false;
 			}
 		}
+        if (laneStateVersion != 1) laneStates = null;
+        if (laneStates != null) {
+            java.util.ArrayList<ReplayLaneState> valid = new java.util.ArrayList<>();
+            long previous = -1;
+            for (ReplayLaneState state : laneStates) {
+                if (state != null && state.valid() && state.time >= previous
+                        && valid.size() < bms.player.beatoraja.play.ReplayLaneTimeline.MAX_EVENTS) {
+                    valid.add(state);
+                    previous = state.time;
+                }
+            }
+            laneStates = valid.toArray(ReplayLaneState[]::new);
+        }
 		return keylog.length > 0;
 	}
 }

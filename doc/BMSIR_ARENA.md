@@ -1,5 +1,9 @@
 # BMS-IR Arena client
 
+鍵盤モード別の[フローティングハイスピード](../docs/FLOATING_HISPEED.md)を追加しました。
+設定画面と通常・コンパクトのオーバーレイから有効にできます。保存緑数字、カバー操作、
+リプレイ対応はリンク先に記載しています。初期状態はOFFです。
+
 Status: BMS-IR Arena v1 release branch. This source prepares the unified
 `Arena oraja 0.4.14.84`. It replaces the separate Endless Dream and
 beatoraja Arena bodies and lets one installation select LR2 or oraja
@@ -157,23 +161,17 @@ scroll and reference-BPM values. Base 100 is 1.00x; reference BPM defaults to
 150 and is adjustable from 50 through 400 in steps of 1. The existing
 OFF/START/MAX/MAIN/MIN HI-SPEED FIX choice selects the chart BPM target.
 
-The BMS-IR settings page has an independent mode selector for these values.
-During Music Select, both the full and compact Arena overlays expose the
-override ON/OFF switch plus base-scroll and reference-BPM controls. The
-overlay editor follows the selected chart mode by default or can be pinned to
-5KEY, 7KEY, 9KEY/PMS, 10KEY DP, 14KEY DP, 24KEY, or 24KEY DP. A labeled
-numeric field edits the normal per-mode HI-SPEED change margin from 0.00
-through 10.00. A separate numeric field directly edits the selected mode's
-HI-SPEED from 0.01 through 20.00 and updates a matching live lane immediately.
-The launcher names the existing `Long Note Modify Mode` as
-`強制LN／ロングノート変換` in Japanese, while preserving its OFF, REMOVE, and
-ADD LN/CN/HCN/ALL behavior, so the option remains visible in both the classic
-and searchable sidebar layouts. The dedicated equivalent-green editor/readout
-and pseudo FHS are not provided; START+SELECT therefore keeps the ordinary
-play behavior. NO
-SPEED courses ignore the override, and replay data stores whether the original
-play used it. Existing configs default the switch off, the editor to follow
-the current chart, base scroll to 100, and reference BPM to 150.
+The dedicated HI-SPEED tab selects Normal, LR2, or Floating independently
+for each key mode. Startup settings, the Arena overlay, and the F5 Play
+Settings window share the selection. Live switching preserves each speed
+mode's values, the chart position, and replay events. NO SPEED constraints
+and replay lane restoration lock the speed controls. BGA display can be
+toggled independently while its playback clock continues.
+
+Legacy global LR2 and per-mode floating settings migrate without changing
+the selected behavior. The new explicit per-mode selection is authoritative.
+The sidecar retains the independent speed values, fixed-BPM selection,
+and BGA display preference when an older body rewrites config_player.json.
 
 Version `0.4.14.58` replaces the untraceable legacy Windows PortAudio and
 JPortAudio binaries with a clean x86-64 build from pinned PortAudio 19.7.0 and
@@ -1177,6 +1175,34 @@ depends on the old `dream-pro.info` redirect for this feature. Ranking reads
 request gzip, accept the BMS-IR Shift-JIS payload, cap decompressed data, and
 keep a short per-chart cache.
 
+The dedicated song leaderboard sends the configured `BMS-IR` account ID,
+including when another service is Primary IR. BMS-IR therefore applies that
+account's existing Web receive setting: full, up to 9999 rows, through self,
+or score submission only (no remote ranking rows). The short ranking cache is
+separate for each account; Web setting changes apply after its 30-second expiry.
+Without a valid BMS-IR account, the existing anonymous view remains available.
+These are the existing receive modes, not a new top-1000 or self-neighborhood
+API. Limited responses contain only the selected ranking rows. The generic
+plugin's player totals/lamp distributions describe received rows, and its
+separate full-score rival synchronization remains unchanged.
+
+Automatic rankings that load after a song/course remains selected also honor
+the Web receive setting. With the matching BMS-IR plugin/server profile support,
+the worker first checks a small receive-profile identity and restores only a
+matching persistent cache. Settings changes and old unclassified entries fetch
+that selected ranking again; unchanged settings reuse the saved rows, including
+successful zero-row responses. Cache/profile I/O runs off the render thread.
+Real plugin scores with gauge-history records now round-trip through the cache.
+Other IRs and older plugins/servers retain their existing cache behavior.
+Profile checks are reused for one minute in the plugin; in-memory rankings keep
+the existing ten-minute refresh interval (one minute for an empty result, ten
+seconds after failure), plus the five-second selection debounce. Changing a Web
+setting therefore applies on the next scheduled refresh or after restarting.
+Failed reads keep the last successful data as an offline fallback, without
+marking its receive setting current. The normal separate rival synchronization
+is unchanged. `full` still retrieves every row; limited modes retain the current
+received-row statistics rather than adding a full-population summary API.
+
 When `BMS-IR段位をローカル同期する` is enabled (the default), a successful
 table fetch from an exactly named `BMS-IR` Primary IR extracts only courses
 with a grade/class constraint. They are written to
@@ -1425,6 +1451,12 @@ ordinary system-sound volume multiplied by the Arena notification volume.
   shared capture path. Export includes width-only and height-only changes and
   copies the temporary current-scene edits to the clipboard. It does not edit
   the separate BMS-IR Arena overlay or write skin source files.
+- Integer-only gauge skins during play and on song/course results display at least
+  `1%` whenever the actual remainder is positive. This also covers NANTOKA
+  MANIA's positive remainder below its first 2% display step. Actual zero stays
+  `0%`. Skins declaring the separate gauge decimal digit keep their existing
+  integer and decimal values, as do nonzero display steps. Gauge arithmetic,
+  death/qualification, history, replays, and IR values retain the actual remainder.
 - The native game window title stays exactly `Arena oraja` across client
   versions so OBS window-capture rules remain stable. Configuration, What's
   New, startup, and other version-identification surfaces keep the versioned
@@ -1476,7 +1508,10 @@ ordinary system-sound volume multiplied by the Arena notification volume.
   advance the independent 1P/2P judgement, combo, key-beam, end-of-note, and
   full-combo timers used by 14-key skins. Each loop resets the lane scan and
   input state, tap key beams release after a bounded hold, and charge-note
-  pairs drive the held-LN body and HOLD timers. All data-backed previews also
+  pairs drive the held-LN body and HOLD timers. Falling-note position uses the
+  synthetic PLAY timer's elapsed time rather than the cycle-relative skin
+  frame time, so later loops restart from the chart beginning instead of
+  producing a negative chart time. All data-backed previews also
   rewind untimed one-shot destinations, cached custom timers/events, and movie
   sources at the loop boundary, so DECIDE, PLAY, RESULT, and COURSE RESULT
   intro/fade animations replay after the first iteration. RESULT and COURSE
@@ -1625,6 +1660,22 @@ platform build.
   `play_scratch_fast(side)`, or `play_scratch_slow(side)`. Side is `1` or
   `2`; direction flags use the most recent 500 ms. An optional second
   duration argument is clamped to 50--2000 ms.
+
+## SELECT retry and HIDDEN controls
+
+START+SELECT exit input and SELECT quick retry do not count toward HIDDEN's
+double press. Closing states (including abort before the first judgment or
+during loading) stop lane-setting adjustments, and a SELECT held into the next
+play must be released before it can arm a fresh double press. During loading,
+READY, and play, two fresh SELECT-only presses less than 500 ms apart still
+toggle HIDDEN. SELECT+keys/scratch green-number adjustments remain available.
+No saved HIDDEN setting or configuration format is changed.
+
+日本語: 終了のSTART＋SELECTとリトライのSELECTをHIDDENの連打判定に含めません。
+終了後のカバー等の調整は停止し、次のプレイまで押し続けたSELECTは一度離してから
+連打判定を開始します。通常のSELECT単独2回押しと緑数字調整は従来どおりです。
+実機では、ロード中／最初の判定前／判定後の終了からSELECTリトライを行い、
+HIDDENが変わらないことと、通常の2回押しでON/OFFできることを確認してください。
 
 ## CONSTANT and scroll modification
 

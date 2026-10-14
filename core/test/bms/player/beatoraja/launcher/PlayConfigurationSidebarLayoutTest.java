@@ -57,6 +57,29 @@ class PlayConfigurationSidebarLayoutTest {
 	}
 
 	@Test
+	void unchangedGreenKeepsOriginalDurationAndModeSelectionIsExclusive() {
+		assertEquals(449, PlayConfigurationView.normalDurationForGreen(449, 269));
+		assertEquals(475, PlayConfigurationView.normalDurationForGreen(449, 285));
+		assertEquals("normal", PlayConfigurationView.speedModeForIndex(0));
+		assertEquals("lr2", PlayConfigurationView.speedModeForIndex(1));
+		assertEquals("floating", PlayConfigurationView.speedModeForIndex(2));
+	}
+
+	@Test
+	void floatingControlsHavePlainLocalizedLabelsAndAssociatedFields() throws Exception {
+		Document document = loadFxml("PlayConfigurationView.fxml");
+		assertEquals("Spinner", elementWithFxId(document, "bmsirFloatingHispeed").getTagName());
+		assertEquals("Spinner", elementWithFxId(document, "bmsirFloatingGreen").getTagName());
+		assertEquals("Label", elementWithFxId(document, "bmsirFloatingMultiplierLabel").getTagName());
+		assertEquals("Label", elementWithFxId(document, "bmsirFloatingGreenLabel").getTagName());
+		for (Locale locale : new Locale[]{Locale.ROOT, Locale.JAPAN}) {
+			ResourceBundle bundle = ResourceBundle.getBundle("resources.UIResources", locale);
+			assertFalse(bundle.getString("BMSIR_FLOATING_HISPEED").isBlank());
+			assertTrue(bundle.getString("BMSIR_FLOATING_DESCRIPTION").contains("0.50"));
+		}
+	}
+
+	@Test
 	void bodyDownloadWarningIsAvailableInEnglishAndJapanese() {
 		ResourceBundle english = ResourceBundle.getBundle("resources.UIResources", Locale.ROOT);
 		ResourceBundle japanese = ResourceBundle.getBundle("resources.UIResources", Locale.JAPAN);
@@ -203,7 +226,7 @@ class PlayConfigurationSidebarLayoutTest {
 				"bmsirCoverControlMode", "bmsirCoverHispeedAutoAdjustEnabled", "bmsirDanLocalSyncEnabled",
 				"bmsirLr2HispeedFixEnabled", "bmsirHispeedMode",
 				"bmsirBaseScrollSpeed", "bmsirHispeedReferenceBpm",
-				"bmsirExportVanillaScoreDb", "bmsirHideMissingTableSongs", "bmsirInfoNotificationsEnabled",
+				"bmsirExportVanillaScoreDb", "bmsirHideMissingTableSongs", "bmsirInfoNotificationsEnabled", "bmsirKeepIgnoredVisible",
 				"bmsirJudgeRankSortEnabled", "bmsirJudgeRankSortSkinNoticeEnabled", "bmsirJudgeTimingRestoreEnabled",
 				"bmsirNumpad0", "bmsirNumpad1", "bmsirNumpad2", "bmsirNumpad3",
 				"bmsirNumpad4", "bmsirNumpad5", "bmsirNumpad6", "bmsirNumpad7", "bmsirNumpad8",

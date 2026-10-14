@@ -201,15 +201,12 @@ public class Lobby {
             lines.set(f, new LogMessage(lines.get(f).msg().concat(msg.msg()), lines.get(f).isSystemMsg()));
         }
 
-        // Show notification if main menu is not shown
-        if (!ArenaMenu.isShow) {
-            String notifyText = msg.msg().substring(4);
-            if (msg.msg().startsWith("[#] ")) {
-                ImGuiNotify.info(notifyText);
-            }
-            if (msg.msg().startsWith("[!] ")) {
-                ImGuiNotify.error(notifyText);
-            }
+        String notifyText = msg.msg().substring(4);
+        if (msg.msg().startsWith("[#] ")) {
+            ImGuiNotify.info(notifyText);
+        }
+        if (msg.msg().startsWith("[!] ")) {
+            ImGuiNotify.error(notifyText);
         }
     }
 
@@ -220,15 +217,12 @@ public class Lobby {
         LogMessage msg = new LogMessage(s, true);
         lines.add(msg);
 
-        // Show notification if main menu is not shown
-        if (!ArenaMenu.isShow) {
-            String notifyText = msg.msg().substring(4);
-            if (msg.msg().startsWith("[#] ")) {
-                ImGuiNotify.info(notifyText);
-            }
-            if (msg.msg().startsWith("[!] ")) {
-                ImGuiNotify.error(notifyText);
-            }
+        String notifyText = msg.msg().substring(4);
+        if (msg.msg().startsWith("[#] ")) {
+            ImGuiNotify.info(notifyText);
+        }
+        if (msg.msg().startsWith("[!] ")) {
+            ImGuiNotify.error(notifyText);
         }
     }
 

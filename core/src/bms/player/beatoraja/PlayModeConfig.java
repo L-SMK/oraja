@@ -30,6 +30,9 @@ public class PlayModeConfig {
     private MidiConfig midi = new MidiConfig();
 
     private int version;
+    private boolean multiInputEnabled;
+    public boolean isMultiInputEnabled() { return multiInputEnabled; }
+    public void setMultiInputEnabled(boolean enabled) { multiInputEnabled = enabled; }
 
     public PlayModeConfig() {
         this(Mode.BEAT_7K);
@@ -65,6 +68,10 @@ public class PlayModeConfig {
 
     public MidiConfig getMidiConfig() {
         return midi;
+    }
+
+    public void setMidiConfig(MidiConfig midi) {
+        this.midi = midi;
     }
 
     public void setController(ControllerConfig[] controllerassign) {
@@ -139,28 +146,34 @@ public class PlayModeConfig {
             midi.keys = Arrays.copyOf(midi.keys, keys);
         }
 
-        // KB, コントローラー, Midiの各ボタンについて排他的処理を実施
-        boolean[] exclusive = new boolean[keyboard.keys.length];
-        validate0(keyboard.keys,  exclusive);
-        for(int i = 0;i < controller.length;i++) {
-            validate0(controller[i].keys,  exclusive);
-        }
-
-        for(int i = 0;i < midi.getKeys().length;i++) {
-            if(exclusive[i]) {
-                midi.getKeys()[i] = null;
+        // Keep stored cross-device assignments. Legacy exclusivity is applied to runtime copies.
+        if (keyboard.additionalBindings != null) {
+            for (int[] row : keyboard.additionalBindings) if (row != null) {
+                for (int alias = 0; alias < row.length; alias++) {
+                    int code = row[alias];
+                    for (bms.player.beatoraja.input.KeyBoardInputProcesseor.ControlKeys control : bms.player.beatoraja.input.KeyBoardInputProcesseor.ControlKeys.values()) {
+                        if (code == control.keycode) row[alias] = -1;
+                    }
+                }
             }
         }
+        keyboard.additionalBindings = normalizeAdditional(keyboard.keys, keyboard.start, keyboard.select,
+                keyboard.diffFilter, keyboard.additionalBindings, 256);
+        for (ControllerConfig c : controller) {
+            c.additionalBindings = normalizeAdditional(c.keys, c.start, c.select, c.diffFilter,
+                    c.additionalBindings, BMKeys.MAXID);
+        }
+        midi.normalizeAdditional();
     }
 
-    private void validate0(int[] keys, boolean[] exclusive) {
-        for(int i = 0;i < exclusive.length;i++) {
-            if(exclusive[i]) {
-                keys[i] = -1;
-            } else if(keys[i] != -1){
-                exclusive[i] = true;
-            }
-        }
+    private static int[][] normalizeAdditional(int[] keys, int start, int select, int filter,
+                                                int[][] extra, int maxCode) {
+        int[] primary = Arrays.copyOf(keys, keys.length + 3);
+        primary[keys.length] = start;
+        primary[keys.length + 1] = select;
+        primary[keys.length + 2] = filter;
+        int[][] normalized = bms.player.beatoraja.input.MultiInputBindings.normalize(primary, extra, maxCode);
+        return Arrays.copyOf(normalized, keys.length + 2);
     }
 
     public PlayConfig getPlayconfig() {
@@ -183,6 +196,10 @@ public class PlayModeConfig {
         private final MouseScratchConfig mouseScratchConfig;
 
         private int[] keys;
+        private int[][] additionalBindings = new int[0][];
+        public int[][] getAdditionalBindings() { return additionalBindings; }
+        public void setAdditionalBindings(int[][] bindings) { additionalBindings = bindings; }
+
 
         private int start;
 
@@ -222,6 +239,7 @@ public class PlayModeConfig {
 		}
 
         public void setKeyAssign(Mode mode, boolean enable) {
+            additionalBindings = new int[0][];
             switch (mode) {
                 case BEAT_5K:
                     keys = new int[] { Keys.Z, Keys.S, Keys.X, Keys.D, Keys.C, Keys.SHIFT_LEFT,
@@ -470,6 +488,10 @@ public class PlayModeConfig {
         private String name = "";
 
         private int[] keys;
+        private int[][] additionalBindings = new int[0][];
+        public int[][] getAdditionalBindings() { return additionalBindings; }
+        public void setAdditionalBindings(int[][] bindings) { additionalBindings = bindings; }
+
 
         private int start;
 
@@ -544,6 +566,7 @@ public class PlayModeConfig {
 		}
 
         public void setKeyAssign(Mode mode, int player, boolean enable) {
+            additionalBindings = new int[0][];
         	final ControllerConfig con = IIDX_PS2;
             if(player == 0) {
                 switch (mode) {
@@ -704,6 +727,32 @@ public class PlayModeConfig {
         }
 
         private Input[] keys;
+        private Input[][] additionalBindings = new Input[0][];
+        public Input[][] getAdditionalBindings() { return additionalBindings; }
+        public void setAdditionalBindings(Input[][] bindings) { additionalBindings = bindings; }
+        private void normalizeAdditional() {
+            Input[][] normalized = new Input[keys.length + 2][];
+            java.util.Set<String> used = new java.util.HashSet<>();
+            for (Input input : keys) if (validInput(input)) used.add(input.toString());
+            for (Input input : new Input[]{start, select, diffFilter}) if (validInput(input)) used.add(input.toString());
+            for (int index = 0; index < normalized.length; index++) {
+                java.util.ArrayList<Input> row = new java.util.ArrayList<>();
+                if (additionalBindings != null && index < additionalBindings.length && additionalBindings[index] != null) {
+                    for (Input input : additionalBindings[index]) {
+                        if (validInput(input) && row.size() < bms.player.beatoraja.input.MultiInputBindings.MAX_ADDITIONAL
+                                && used.add(input.toString())) row.add(new Input(input));
+                    }
+                }
+                normalized[index] = row.toArray(Input[]::new);
+            }
+            additionalBindings = normalized;
+        }
+        private static boolean validInput(Input input) {
+            return input != null && input.type != null &&
+                    (input.type == Input.Type.NOTE && input.value >= 0 && input.value < 128
+                    || input.type == Input.Type.PITCH_BEND && (input.value == 1 || input.value == -1));
+        }
+
         private Input start;
         private Input select;
 		private Input diffFilter;
@@ -753,6 +802,7 @@ public class PlayModeConfig {
         }
 
         public void setKeyAssign(Mode mode, boolean enable) {
+            additionalBindings = new Input[0][];
             switch (mode) {
                 case BEAT_5K:
                     // 5keys

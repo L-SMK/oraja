@@ -35,6 +35,24 @@ setting and restart after the capture is complete.
 
 ## Metric meaning
 
+The development body reduces steady Lua callback allocation: `main_state.time`,
+`timer`, `number`, and `float_number` reuse immutable numeric wrappers when the
+freshly read value is unchanged. Each keyed cache has 128 fixed slots; collisions
+replace a wrapper rather than growing the cache. Underlying getters still run on
+every invocation, including multiple calls at one frame timestamp, so timer,
+input, score and preview updates are not cached away. Standard Lua `type()` names
+also reuse immutable strings. Lua scripts can still replace `type` themselves.
+This reduces allocation pressure; it does not establish a GC pause deadline or
+prove that every BGA/frame stall is resolved.
+
+`main_state.text` also reuses unchanged immutable Lua strings through a fixed
+64-slot content cache, bypassed above 4096 characters. The source getter still
+runs on every call. Lua string properties always invoke their callback, but can
+reuse the Java decoding of an unchanged exact LuaString instance (up to 4096
+characters). Other Lua values retain their dynamic `tojstring()` behavior. These
+caches neither increase the JVM heap setting nor alter GC selection or the
+number of retained skin images.
+
 All timing distributions contain `count`, `average_us`, `p50_us`, `p95_us`,
 `p99_us`, `max_us`, and `max_at`. `max_at` is the UTC instant at which the
 period's maximum was observed. Percentiles use fixed upper-bound buckets, so
@@ -79,9 +97,11 @@ mixer work and scheduling delay.
 
 Static-BGA preparation emits one bounded `static_bga_cache_plan` event per
 chart. `unique_images` is the number of referenced, available static images,
-`cache_slots` is the direct-mapped texture-cache capacity, `initial_uploads` is
-the number selected for preparation, and `colliding_images` is the remaining
-unique-image count that shares an already-selected slot. The event does not
+`cache_slots` is the independent-texture LRU capacity, `initial_uploads` is
+the number selected for preparation, and `deferred_images` is the remaining
+image count beyond that capacity. `colliding_images` is retained as zero for
+compatibility with older captures. IDs
+that formerly collided now occupy independent entries. The event does not
 contain image names or chart paths.
 
 `audio_config` records the selected backend and, for PortAudio/ASIO, the actual
@@ -122,12 +142,19 @@ OpenGL texture work is not moved to a worker thread.
   waiting behind the render loop. Stable `retained_movie_bytes` and decoder
   counts argue against a leak; values that keep rising after songs are released
   justify a lifecycle investigation.
-- For an image-sequence BGA, compare `static_bga_cache_plan.colliding_images`
-  with `bga_static_cache_misses` and `bga_static_runtime_upload_us`. Repeated
-  same-size updates whose maxima align with `render_stall` or a long
-  `render_duration_us` tail are evidence that direct-mapped cache churn is
-  contributing to the hitch. A collision count alone does not prove a visible
-  stall because the chart may rarely revisit those images.
+- For an image-sequence BGA, compare the deferred count in
+  `static_bga_cache_plan.deferred_images` with `bga_static_cache_misses` and
+  `bga_static_runtime_upload_us`. Maxima aligned with `render_stall` or a long
+  `render_duration_us` tail can identify LRU churn when the working set exceeds
+  capacity. The deferred count alone does not prove a visible stall.
+- The asynchronous movie path adds `bga_async_prepare_us`, `bga_poll_frame_us`,
+  `bga_open_us`, `bga_seek_us`, `bga_convert_us`, `bga_draw_us`, and
+  `bga_render_wait_us`, plus decoded/uploaded/dropped/reused/seek counters.
+  It does not post a render runnable per frame or retain a whole movie in heap.
+  `bga_render_wait_us` records zero for decoder waits by construction; upload
+  and draw times still include real work and can exceed the frame budget.
+  See [BGA pipeline](BGA_PIPELINE.md) for the memory boundary, profiles, rollback,
+  and the operator-run before/after comparison.
 - PortAudio `mix_us` or `write_us` approaching/exceeding the configured buffer
   duration, underflows, or write errors identify an audio-path problem. OpenAL
   captures can only show call time, not backend/device latency.

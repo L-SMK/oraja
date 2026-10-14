@@ -1,0 +1,46 @@
+package bms.player.beatoraja.skin;
+
+import bms.player.beatoraja.MainState;
+import bms.player.beatoraja.camera.CameraCrop;
+import bms.player.beatoraja.skin.scene.FrameDrivenSkinObject;
+import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
+
+/** A camera is a destination-controlled skin object, never a skin-selected device or network source. */
+public final class SkinCamera extends SkinObject implements FrameDrivenSkinObject {
+    private final CameraCrop crop;
+    private final TextureRegion image = new TextureRegion();
+    private boolean mirror;
+
+    public SkinCamera(CameraCrop crop) {
+        this.crop = crop;
+        setStretch(StretchType.KEEP_ASPECT_RATIO_FIT_INNER);
+    }
+
+    @Override public boolean validate() { return crop.valid() && super.validate(); }
+
+    @Override public void prepareFrame(long time, long nowMicros, MainState state) {
+        super.prepare(time, state);
+        if (!draw || !visible || color.a <= 0 || region.width <= 0 || region.height <= 0
+                || state.main.getCurrentState() != state || state.main.getHandCameraManager() == null) {
+            draw = false;
+            return;
+        }
+        Texture texture = state.main.getHandCameraManager().requestTexture();
+        if (texture == null) { draw = false; return; }
+        int[] source = crop.pixels(texture.getWidth(), texture.getHeight());
+        image.setTexture(texture);
+        image.setRegion(source[0], source[1], source[2], source[3]);
+        mirror = state.main.getConfig().isHandCameraMirror();
+    }
+
+    @Override public void draw(Skin.SkinObjectRenderer sprite) {
+        draw(sprite, image, region.x, region.y, region.width, region.height);
+    }
+
+    @Override protected void transformDrawImage(TextureRegion image) {
+        if (mirror) image.flip(true, false);
+    }
+
+    @Override public void dispose() { setDisposed(); }
+}

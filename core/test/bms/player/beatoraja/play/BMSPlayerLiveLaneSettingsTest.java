@@ -9,6 +9,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BMSPlayerLiveLaneSettingsTest {
     @Test
+    void floatingRuntimePersistsMultiplierAndUnroundedGreenWithoutReplacingLegacySpeed() {
+        PlayConfig saved = new PlayConfig(); saved.setBmsirFloatingHispeedEnabled(true);
+        saved.setHispeed(4); saved.setDuration(650);
+        PlayConfig live = saved.clone(); live.setBmsirFloatingHispeed(3.125f);
+        live.setBmsirFloatingGreenFrames(32.123456f); live.setBmsirFloatingCoverVisible(false);
+        BMSPlayer.copyLiveLaneSettings(saved, live, false);
+        assertEquals(3.125f, saved.getBmsirFloatingHispeed());
+        assertEquals(32.123456f, saved.getBmsirFloatingGreenFrames());
+        assertEquals(4f, saved.getHispeed()); assertEquals(650, saved.getDuration());
+        assertTrue(saved.isBmsirFloatingCoverVisible());
+    }
+    @Test
     void fixedHispeedPersistsTheLiveDurationAndCompleteCoverState() {
         PlayConfig saved = new PlayConfig();
         saved.setFixhispeed(PlayConfig.FIX_HISPEED_MAINBPM);

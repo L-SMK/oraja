@@ -66,6 +66,32 @@ public class BMSResource {
 		bga = new BGAProcessor(config, player);
 	}
 
+    /** Queue behind prior loaders; replay rebinding never recreates thumbnail GL textures. */
+    public void rebindReplayModel(BMSModel recorded, SongResource chart, Config config, BMSPlayerMode mode) {
+        this.model = recorded;
+        if (MainLoader.getIllegalSongCount() != 0) return;
+        Thread[] previousBga = bgaloaders.toArray(Thread[]::new);
+        Thread[] previousAudio = audioloaders.toArray(Thread[]::new);
+        BMSModel bgamodel = config.getBga() == Config.BGA_ON || config.getBga() == Config.BGA_AUTO
+                && (mode.mode == BMSPlayerMode.Mode.AUTOPLAY || mode.mode == BMSPlayerMode.Mode.REPLAY) ? recorded : null;
+        Thread background = new Thread(() -> {
+            try {
+                for (Thread prior : previousBga) prior.join();
+                bga.abort(); bga.setModel(bgamodel, chart); bgaon = bgamodel != null;
+            } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+            catch (Throwable failure) { logger.error("Replay BGA rebinding failed: {}", failure.getMessage()); }
+        }, "replay-bga-rebind");
+        Thread audioLoader = new Thread(() -> {
+            try {
+                for (Thread prior : previousAudio) prior.join();
+                audio.abort(); audio.setModel(recorded, chart);
+            } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+            catch (Throwable failure) { logger.error("Replay audio rebinding failed: {}", failure.getMessage()); }
+        }, "replay-audio-rebind");
+        bgaloaders.addLast(background); audioloaders.addLast(audioLoader);
+        background.start(); audioLoader.start();
+    }
+
 	public boolean setBMSFile(BMSModel model, final SongResource chart, final Config config, BMSPlayerMode mode) {
 		if(stagefile != null) {
 			stagefile.getTexture().dispose();

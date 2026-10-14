@@ -9,6 +9,18 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class JSONSkinLoaderSceneIdTest {
+    @Test
+    void cameraIdsParticipateInSceneCollisionProtection() {
+        JsonSkin.Skin skin = new JsonSkin.Skin();
+        JsonSkin.Camera camera = new JsonSkin.Camera();
+        camera.id = "hands";
+        skin.camera = new JsonSkin.Camera[] {camera};
+        skin.scenes = new JsonSkin.SceneResource[] {scene("hands", "camera.scene.json")};
+        JSONSkinLoader loader = new JSONSkinLoader();
+        loader.prepareSceneResources(skin);
+        assertTrue(loader.claimsSceneId("hands"));
+        assertFalse(loader.hasEnabledSceneId("hands"));
+    }
 	@Test
 	void collisionsClaimDestinationButNeverFallBackOrReenable() {
 		JsonSkin.Skin skin = new JsonSkin.Skin();

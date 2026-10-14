@@ -10,9 +10,9 @@ public enum ModMenuItem {
     SONG_MANAGER("song_manager", "楽曲管理", "Song Manager"),
     DOWNLOAD_TASKS("download_tasks", "ダウンロード状況", "Download Tasks"),
     PERFORMANCE_MONITOR("performance_monitor", "パフォーマンスモニター", "Performance Monitor"),
-    MISC_SETTINGS("misc_settings", "その他設定", "Misc Settings"),
-    LEGACY_ARENA_MENU("legacy_arena_menu", "従来Arenaメニュー", "Legacy Arena Menu"),
-    LEGACY_ARENA_GRAPH("legacy_arena_graph", "従来Arenaグラフ", "Legacy Arena Graph"),
+    PLAY_SETTINGS("play_settings", "プレイ設定", "Play Settings"),
+    SOUND_SETTINGS("sound_settings", "音", "Sound"),
+    DISPLAY_SETTINGS("display_settings", "表示", "Display"),
     BMSIR_ARENA_OVERLAY("bmsir_arena_overlay", "BMS-IR Arenaオーバーレイ", "BMS-IR Arena Overlay"),
     ARENA_DEBUG("arena_debug", "Arena orajaデバッグ情報", "Arena oraja Debug Information"),
     MANIAC_OPTIONS("maniac_options", "MANIAC OPTIONS", "MANIAC OPTIONS");

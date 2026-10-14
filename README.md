@@ -1,5 +1,8 @@
 # BMS-IR Arena oraja
 
+鍵盤モード別に選択できる[フローティングハイスピード](docs/FLOATING_HISPEED.md)を追加しました。
+倍率0.50～10.00、START＋鍵盤で±0.50、カバー操作時は保存緑数字へ戻ります。初期状態はOFFです。
+
 BMS-IR向けの専用LR2oraja Endless Dreamクライアントです。通常プレイに加え、
 BMS-IR Arena、BMS-IR固有設定、専用ランチャーなどを収録しています。
 
@@ -8,12 +11,135 @@ Arena oraja client. It is based on
 [LR2oraja Endless Dream](https://github.com/Catizard/lr2oraja-endlessdream)
 and ultimately on [beatoraja](https://github.com/exch-bms2/beatoraja).
 
+選曲画面のF5メニューとArenaオーバーレイ（通常／コンパクト）に
+「ファンクションキーメニューを開く」があります。Fキーとテンキーの機能を
+名前で選べるため、キーへの割り当てなしで操作できます。
+詳細と実機確認項目は [機能一覧メニュー](docs/FUNCTION_KEY_MENU.md) を参照してください。
+
 音声設定には独自DSPのSwitch方式4バンド／LR2風7バンドEQがあります。
 PortAudio／ASIO対応で、初期OFF、方式ごとのゲイン保存、プリアンプ調整が可能です。
 OpenALでは未対応と表示し、設定値を保持します。変更は本体の再起動後に適用します。
 詳細と実機確認項目は [出力EQ](docs/OUTPUT_EQUALIZER.md) を参照してください。
 
 ## Current Version
+
+Version 0.4.14.111 preserves the 0.4.14.110 release lineage and adds the
+dedicated HI-SPEED tab, live speed-mode switching, BGA display toggling,
+settings-window cleanup, gauge/input/replay fixes, compatibility repairs,
+and Lua allocation reductions. Updates remain optional; plugin 0.0.79 and
+launcher 0.2.30 are retained. See [the test scope](docs/TEST_RELEASE_0.4.14.111.md).
+
+上流監査で残ったIR設定保持、音量正規化、ゲージ/トレーナー表示、BGA/旧BMS互換の
+9件を修正しました。解析が変わる可能性のある譜面は旧成績と新成績のローカル保存を分け、
+旧リプレイは記録時の解析で再生します。公開譜面ハッシュは保持します。
+更新後の楽曲DB刷新、保存/リプレイ/IRの互換性と実機確認は
+[上流不具合修正の説明](docs/UPSTREAM_BUGFIXES_2026-10-13.md)を参照してください。
+ソース実装のみで、配布は別工程です。
+
+開発ソースに、任意のスクショ保存音、リプレイの開始表示設定・曲中HS/カバー操作の再現、
+キー数別の複数入力割当を追加しました。複数入力は最後の入力を離すまで押下を保持します。
+旧リプレイと既存設定を維持し、リプレイの表示設定を普段の設定へ書き戻しません。
+操作と互換性、実機確認項目は [スクショ・リプレイ・複数入力](docs/SCREENSHOT_REPLAY_BINDINGS.md)
+を参照してください。
+
+手元カメラ入力をJSON/Luaスキンの `camera` 部品で表示できます（初期OFF）。
+位置・サイズ・切り抜き・表示条件をスキンで管理します。
+設定方法と例、実機確認項目は [手元カメラ](docs/HAND_CAMERA.md) を参照してください。
+
+Version 0.4.14.110 preserves every feature in the 0.4.14.109 optional test
+lineage and adds skin-controlled hand camera input. Launcher 0.2.30 includes
+the macOS camera usage description; plugin 0.0.79 is retained. Updates remain
+optional. See [the test scope](docs/TEST_RELEASE_0.4.14.110.md).
+
+Version 0.4.14.106 preserves the 0.4.14.105 internal test lineage and refines
+generated charts: repeated bars keep their own fills, choruses get chords like
+A-melodies, no notes on dying tails, and notes stay within the span where the
+music plays on the beat (a video's talk intro gets none). Plugin 0.0.77 and
+launcher 0.2.29 remain optional. See
+[the test scope](docs/TEST_RELEASE_0.4.14.106.md).
+
+Version 0.4.14.105 preserves the 0.4.14.104 internal test lineage and lets
+generated charts follow a drifting tempo (bands without a click) with exact
+per-bar BPM changes; steady songs keep a constant BPM. Plugin 0.0.77 and
+launcher 0.2.29 remain optional. See
+[the test scope](docs/TEST_RELEASE_0.4.14.105.md).
+
+Version 0.4.14.104 preserves the 0.4.14.103 internal test lineage and keeps
+generated-chart notes out of silent breaks and off false triplets: a triplet
+needs its sound to peak at the triplet (late 16ths stay 16ths, half-tempo 3/8
+sounds are not snapped). Plugin 0.0.77 and launcher 0.2.29 remain optional.
+See [the test scope](docs/TEST_RELEASE_0.4.14.104.md).
+
+Version 0.4.14.103 preserves the 0.4.14.102 internal test lineage and generates
+charts from video files: the audio track is extracted aligned to the first
+video frame and the video plays as the BGA. Plugin 0.0.77 and launcher 0.2.29
+remain optional. See [the test scope](docs/TEST_RELEASE_0.4.14.103.md).
+
+Version 0.4.14.102 preserves the 0.4.14.101 internal test lineage and charts
+straight 16ths and triplets per position (a union grid where 1/4 vs 1/3 and
+2/3 vs 3/4 compete), replacing the song-wide rhythm setting of 0.4.14.101.
+Plugin 0.0.77 and launcher 0.2.29 remain optional. See
+[the test scope](docs/TEST_RELEASE_0.4.14.102.md).
+
+Version 0.4.14.101 preserves the 0.4.14.100 internal test lineage and adds a
+16ths/triplet rhythm choice for generated charts (fixed grid also 12th/24th),
+an interval-based beat bonus for slow songs, and song-wide loudness in the
+ranking so thin passages stay thin. Plugin 0.0.77 and launcher 0.2.29 remain
+optional. See [the test scope](docs/TEST_RELEASE_0.4.14.101.md).
+
+Version 0.4.14.100 preserves the 0.4.14.99 internal test lineage and refines
+generated charts: scratch only on clear hi-hats (about one position in ten),
+a one-press half/double tempo choice when it is a close call, and per-song
+memory of the player's BPM / first-beat correction. Plugin 0.0.77 and launcher
+0.2.29 remain optional. See [the test scope](docs/TEST_RELEASE_0.4.14.100.md).
+
+Version 0.4.14.99 preserves the 0.4.14.98 internal test lineage and makes
+generated charts follow the music: notes where the music hits (note amount
+scales the song's own density), repeated phrases reuse their layout, and
+scratch on hi-hats. Each can be switched off (off = the fixed 4th/8th/16th
+grid). Plugin 0.0.77 and launcher 0.2.29 remain optional. See
+[the test scope](docs/TEST_RELEASE_0.4.14.99.md).
+
+Version 0.4.14.98 preserves the 0.4.14.97 internal test lineage and fixes a
+Music Select crash as soon as the CHARTS FROM AUDIO row was drawn (0.4.14.97
+with an audio folder set). Plugin 0.0.77 and launcher 0.2.29 remain optional.
+See [the test scope](docs/TEST_RELEASE_0.4.14.98.md).
+
+Version 0.4.14.97 preserves the 0.4.14.96 internal test lineage and fixes the
+CHARTS FROM AUDIO folder and its folder/audio-file rows rendering as blank
+bars; the top settings row now names the song. Plugin 0.0.77 and launcher
+0.2.29 remain optional. See [the test scope](docs/TEST_RELEASE_0.4.14.97.md).
+
+Version 0.4.14.96 preserves the 0.4.14.95 internal test lineage and makes
+generated charts usable with the controller alone: an audio folder set in the
+pre-launch Resource settings appears in Music Select as CHARTS FROM AUDIO,
+where analysis, settings and Play are all decide-button rows. Plugin 0.0.77
+and launcher 0.2.29 remain optional. Physical acceptance remains pending.
+See [the test scope](docs/TEST_RELEASE_0.4.14.96.md).
+
+Version 0.4.14.95 preserves the 0.4.14.94 internal test lineage and adds
+charts generated from an audio file dropped in Music Select (no score, replay,
+IR, or Arena), named key/play-setting profiles in the Arena overlay, and an
+IGNORED root folder with a keep-visible option. Plugin 0.0.77 and launcher
+0.2.29 remain optional. Physical acceptance remains operator-run and pending.
+See [the test scope](docs/TEST_RELEASE_0.4.14.95.md).
+
+Version 0.4.14.94 preserves the 0.4.14.93 internal test lineage and adds live
+output EQ adjustment from the F5 menu and a named function-key/numpad menu
+on Music Select. Plugin 0.0.77 and launcher 0.2.29 remain optional.
+Physical BGA, audio, and menu acceptance remains operator-run and pending.
+See [the test scope](docs/TEST_RELEASE_0.4.14.94.md).
+
+Version 0.4.14.93 is an optional internal test candidate for the BGA
+asynchronous pipeline over 0.4.14.92. Video decode/seek uses bounded workers
+and native RGB leases, while GL polls frames and reuses textures. Video
+settings add OFF/PERFORMANCE/BALANCED/QUALITY, asynchronous playback and
+Performance Monitor statistics. BALANCED and asynchronous playback are the
+defaults; disabling asynchronous playback restores the old movie route.
+See [the BGA pipeline guide](docs/BGA_PIPELINE.md). Physical frame-time/audio
+acceptance and total codec/GPU native-memory evaluation remain pending in
+[Issue #413](https://github.com/tenP0312-dev/oraja/issues/413); this internal
+test does not establish complete requirement acceptance.
 
 Version 0.4.14.92 updates NANTOKA MANIA v2 judgment handling:
 DP scratch windows, separate candidate/miss limits, consumed HCN endpoints,
@@ -74,7 +200,7 @@ indicators; the ASSIST key toggles REGUL SPEED. This optional test retains all
 0.4.14.86 features, plugin 0.0.75 and launcher 0.2.29. Physical acceptance is
 tracked in issue #372; source/build tests do not establish visual recovery.
 
-The current client source version is **0.4.14.92**. Its Windows native-audio
+The current client source version is **0.4.14.106**. Its Windows native-audio
 runtime is rebuilt from pinned PortAudio 19.7.0 and the official Steinberg ASIO
 SDK 2.3.4 under the GPLv3 route. The package carries the corresponding source,
 licenses, source/build manifest, and SPDX SBOM; CI rejects an unverified or
@@ -257,6 +383,13 @@ from the per-mode HI-SPEED change step. The override is disabled for NO SPEED
 constraints and is snapshotted into replays. It does not add a pseudo-FHS
 chord or an equivalent-green editor.
 
+The dedicated HI-SPEED tab selects Normal, LR2, or Floating independently
+for each key mode. Startup settings, the Arena overlay, and the F5 Play
+Settings window share the selection. Live switching preserves each speed
+mode's values, the chart position, and replay events. NO SPEED constraints
+and replay lane restoration lock the speed controls. BGA display can be
+toggled independently while its playback clock continues.
+
 The launcher Skin settings provide a default-on switch for the live Skin
 Select preview. Turning it off skips preview construction, reload, and render
 work while leaving skin selection and all custom options available. The choice
@@ -387,7 +520,10 @@ feel remains a final manual acceptance item before merge or distribution.
 Play-skin previews now expose the synthetic session as ordinary play, include
 a silent representative BGA, and drive gauge-increase and gauge-max timers.
 Skins such as WMII can therefore construct their normal-play score graph and
-BGA frame and animate gauge effects without leaving Skin Select.
+BGA frame and animate gauge effects without leaving Skin Select. Falling notes
+now use the synthetic PLAY timer's elapsed time, so they continue from the
+chart start after every preview loop while untimed skin animations still
+rewind.
 
 The current development source separates Arena play cursor visibility from
 pointer capture. When `Show cursor during play` is off, the cursor becomes

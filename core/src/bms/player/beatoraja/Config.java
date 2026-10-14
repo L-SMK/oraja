@@ -187,12 +187,24 @@ public class Config implements Validatable {
 
 	private int frameskip = 1;
 
+    private boolean handCameraEnabled;
+    private String handCameraDevice = "";
+    private int handCameraWidth = 640, handCameraHeight = 480, handCameraFps = 30;
+    private boolean handCameraMirror;
+
 	/**
 	 * Write opt-in BGA/input/render/audio timing summaries to
 	 * logs/bmsir-timing.log. Disabled by default because even lightweight
 	 * instrumentation should not be imposed on normal gameplay.
 	 */
 	private boolean timingDiagnostics = false;
+
+    private String bgaQualityMode = "BALANCED";
+    private boolean bgaAsyncPipeline = true;
+    private int bgaMaxFps, bgaMaxWidth, bgaMaxHeight, bgaDecodedQueueLength;
+    private int bgaPreloadWindowMs = -1, bgaPreloadResourceCount = -1;
+    private int bgaMaxActiveDecoders = 2, bgaNativeMemoryBudgetMb = 128;
+    private boolean bgaDropLateFrames = true, bgaShowPerformanceStats;
 
 	private boolean updatesong = false;
 
@@ -217,11 +229,16 @@ public class Config implements Validatable {
 	private String downloadDirectory = DEFAULT_DOWNLOAD_DIRECTORY;
 	public static final String DEFAULT_DOWNLOAD_DIRECTORY = "http_download";
 	private String workDirectory = "";
+	/** Folder whose audio files are listed for generated practice charts; empty hides the folder. */
+	private String generatedChartAudioDirectory = "";
 
 	private int irSendCount = 5;
 
 	private boolean useDiscordRPC = false;
 	private boolean setClipboardScreenshot = false;
+    private boolean screenshotSound = false;
+    private float screenshotSoundVolume = 0.5f;
+    private boolean replayLaneSettings = true;
 
 	public enum ScreenShotFormat {
 		PNG, JPG
@@ -420,9 +437,52 @@ public class Config implements Validatable {
 		return bga;
 	}
 
+    public boolean isHandCameraEnabled() { return handCameraEnabled; }
+    public void setHandCameraEnabled(boolean value) { handCameraEnabled = value; }
+    public String getHandCameraDevice() { return handCameraDevice; }
+    public void setHandCameraDevice(String value) { handCameraDevice = value; }
+    public int getHandCameraWidth() { return handCameraWidth; }
+    public void setHandCameraWidth(int value) { handCameraWidth = value; }
+    public int getHandCameraHeight() { return handCameraHeight; }
+    public void setHandCameraHeight(int value) { handCameraHeight = value; }
+    public int getHandCameraFps() { return handCameraFps; }
+    public void setHandCameraFps(int value) { handCameraFps = value; }
+    public boolean isHandCameraMirror() { return handCameraMirror; }
+    public void setHandCameraMirror(boolean value) { handCameraMirror = value; }
+
 	public void setBga(int bga) {
 		this.bga = bga;
 	}
+
+    public bms.player.beatoraja.play.bga.BgaQualityProfile.Mode getBgaQualityMode() {
+        try { return bms.player.beatoraja.play.bga.BgaQualityProfile.Mode.valueOf(bgaQualityMode); }
+        catch (IllegalArgumentException | NullPointerException ignored) {
+            return bms.player.beatoraja.play.bga.BgaQualityProfile.Mode.BALANCED;
+        }
+    }
+    public void setBgaQualityMode(bms.player.beatoraja.play.bga.BgaQualityProfile.Mode mode) { bgaQualityMode = mode == null ? "BALANCED" : mode.name(); }
+    public boolean isBgaAsyncPipeline() { return bgaAsyncPipeline; }
+    public void setBgaAsyncPipeline(boolean value) { bgaAsyncPipeline = value; }
+    public int getBgaMaxFps() { return bgaMaxFps; }
+    public void setBgaMaxFps(int value) { bgaMaxFps = value; }
+    public int getBgaMaxWidth() { return bgaMaxWidth; }
+    public void setBgaMaxWidth(int value) { bgaMaxWidth = value; }
+    public int getBgaMaxHeight() { return bgaMaxHeight; }
+    public void setBgaMaxHeight(int value) { bgaMaxHeight = value; }
+    public int getBgaPreloadWindowMs() { return bgaPreloadWindowMs; }
+    public void setBgaPreloadWindowMs(int value) { bgaPreloadWindowMs = value; }
+    public int getBgaPreloadResourceCount() { return bgaPreloadResourceCount; }
+    public void setBgaPreloadResourceCount(int value) { bgaPreloadResourceCount = value; }
+    public int getBgaDecodedQueueLength() { return bgaDecodedQueueLength; }
+    public void setBgaDecodedQueueLength(int value) { bgaDecodedQueueLength = value; }
+    public boolean isBgaDropLateFrames() { return bgaDropLateFrames; }
+    public void setBgaDropLateFrames(boolean value) { bgaDropLateFrames = value; }
+    public int getBgaMaxActiveDecoders() { return bgaMaxActiveDecoders; }
+    public void setBgaMaxActiveDecoders(int value) { bgaMaxActiveDecoders = value; }
+    public int getBgaNativeMemoryBudgetMb() { return bgaNativeMemoryBudgetMb; }
+    public void setBgaNativeMemoryBudgetMb(int value) { bgaNativeMemoryBudgetMb = value; }
+    public boolean isBgaShowPerformanceStats() { return bgaShowPerformanceStats; }
+    public void setBgaShowPerformanceStats(boolean value) { bgaShowPerformanceStats = value; }
 
 	public boolean isTimingDiagnostics() {
 		return timingDiagnostics;
@@ -667,6 +727,15 @@ public class Config implements Validatable {
 		this.setClipboardScreenshot = setClipboardScreenshot;
 	}
 
+    public boolean isScreenshotSound() { return screenshotSound; }
+    public void setScreenshotSound(boolean enabled) { screenshotSound = enabled; }
+    public float getScreenshotSoundVolume() {
+        return Float.isFinite(screenshotSoundVolume) ? Math.max(0, Math.min(1, screenshotSoundVolume)) : 0.5f;
+    }
+    public void setScreenshotSoundVolume(float volume) { screenshotSoundVolume = volume; }
+    public boolean isReplayLaneSettings() { return replayLaneSettings; }
+    public void setReplayLaneSettings(boolean enabled) { replayLaneSettings = enabled; }
+
 	public ScreenShotFormat getScreenshotFormat() {
 		return screenshotFormat != null ? screenshotFormat : ScreenShotFormat.PNG;
 	}
@@ -768,6 +837,14 @@ public class Config implements Validatable {
 
 	public void setWorkDirectory(String workDirectory) {
 		this.workDirectory = workDirectory;
+	}
+
+	public String getGeneratedChartAudioDirectory() {
+		return generatedChartAudioDirectory;
+	}
+
+	public void setGeneratedChartAudioDirectory(String generatedChartAudioDirectory) {
+		this.generatedChartAudioDirectory = generatedChartAudioDirectory;
 	}
 
 	public String getIpfsUrl() {
@@ -1003,7 +1080,21 @@ public class Config implements Validatable {
 		tableURL = Validatable.removeInvalidElements(tableURL);
 
 		bga = MathUtils.clamp(bga, 0, 2);
+        var camera = bms.player.beatoraja.camera.HandCameraSettings.from(this);
+        handCameraDevice = camera.device();
+        handCameraWidth = camera.width();
+        handCameraHeight = camera.height();
+        handCameraFps = camera.fps();
 		bgaExpand = MathUtils.clamp(bgaExpand, 0, 2);
+        bgaQualityMode = getBgaQualityMode().name();
+        if (bgaMaxFps != 0 && bgaMaxFps != 15 && bgaMaxFps != 24 && bgaMaxFps != 30 && bgaMaxFps != 60) bgaMaxFps = 0;
+        bgaMaxWidth = MathUtils.clamp(bgaMaxWidth, 0, 7680);
+        bgaMaxHeight = MathUtils.clamp(bgaMaxHeight, 0, 4320);
+        bgaPreloadWindowMs = MathUtils.clamp(bgaPreloadWindowMs, -1, 2000);
+        bgaPreloadResourceCount = MathUtils.clamp(bgaPreloadResourceCount, -1, 3);
+        bgaDecodedQueueLength = MathUtils.clamp(bgaDecodedQueueLength, 0, 4);
+        bgaMaxActiveDecoders = MathUtils.clamp(bgaMaxActiveDecoders, 1, 3);
+        bgaNativeMemoryBudgetMb = MathUtils.clamp(bgaNativeMemoryBudgetMb, 16, 512);
 		if (ipfsurl == null) {
 			ipfsurl = "https://gateway.ipfs.io/";
 		}
@@ -1015,6 +1106,7 @@ public class Config implements Validatable {
 		skinpath = skinpath != null ? skinpath : SKINPATH_DEFAULT;
 		downloadDirectory = validatePath(downloadDirectory) ? downloadDirectory : DEFAULT_DOWNLOAD_DIRECTORY;
 		workDirectory = validatePath(workDirectory) ? workDirectory : "";
+		generatedChartAudioDirectory = validatePath(generatedChartAudioDirectory) ? generatedChartAudioDirectory : "";
 		return true;
 	}
 
