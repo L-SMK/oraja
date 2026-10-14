@@ -37,6 +37,7 @@ public class SkinLuaAccessor {
 
 	public SkinLuaAccessor(boolean isGlobal) {
 		globals = JsePlatform.standardGlobals();
+		SkinLuaValueCache.installTypeFunction(globals);
 		this.isGlobal = isGlobal;
 
 		if (!isGlobal) {
