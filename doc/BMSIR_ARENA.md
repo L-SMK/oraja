@@ -15,8 +15,8 @@ LN-only. No release channel or existing v7 artifact changes until a separate
 reviewed build and rollout.
 
 The dedicated HI-SPEED tab selects Normal, LR2, or Floating independently
-for each key mode. Startup settings, the Arena overlay, and the F5 Play
-Settings window share the selection. Live switching preserves each speed
+for each key mode. Startup settings and the F5 Play Settings window share
+the selection; the Arena overlays no longer show a HI-SPEED editor. Live switching preserves each speed
 mode's values, the chart position, and replay events. NO SPEED constraints
 and replay lane restoration lock the speed controls. BGA display can be
 toggled independently while its playback clock continues.
@@ -217,8 +217,9 @@ the master.
 The table editor is no longer an Arena overlay tab: open it from the F5 Mod
 Menu's `難易度表編集` / `Table Editor` window (filterable like other Mod Menu
 items). The music-select Arena overlay tabs are ordered Battle, Lobby / Rooms,
-Rating, HI-SPEED, Profiles, Settings, Manual; `BGAを表示` lives with the
-display toggles in Settings and the F5 Display window, not under HI-SPEED.
+Rating, Profiles, Settings, Manual. HI-SPEED is edited only in the F5 Play
+Settings window, and `BGAを表示` lives with the display toggles in Settings
+and the F5 Display window.
 
 Version `0.4.14.37` lets an existing table hold metadata and up to 64
 selected-chart add/update/remove changes as an in-memory draft. The overlay

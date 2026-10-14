@@ -125,7 +125,6 @@ public class MiscSettingMenu {
             }
             if (ImGui.beginTabItem(t("ハイスピード", "HI-SPEED"))) {
                 BMSIRArenaOverlay.renderHispeedSettings();
-                alsoInArena(t("Arenaオーバーレイのハイスピードタブ", "the Arena overlay HI-SPEED tab"));
                 ImGui.endTabItem();
             }
             ImGui.endTabBar();
