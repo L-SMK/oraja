@@ -611,6 +611,16 @@
 	                        <Label text="%MODE" />
 	                        <ComboBox fx:id="bmsirHispeedMode" onAction="#updateBmsirHispeedMode" prefWidth="180.0" />
 	                    </HBox>
+	                    <CheckBox fx:id="bmsirFloatingHispeedEnabled" mnemonicParsing="false" text="%BMSIR_FLOATING_HISPEED" />
+	                    <Label maxWidth="680.0" text="%BMSIR_FLOATING_DESCRIPTION" wrapText="true" />
+	                    <HBox alignment="CENTER_LEFT" spacing="8.0">
+	                        <Label fx:id="bmsirFloatingMultiplierLabel" text="%BMSIR_FLOATING_MULTIPLIER" />
+	                        <Spinner fx:id="bmsirFloatingHispeed" editable="true" prefWidth="110.0" />
+	                    </HBox>
+	                    <HBox alignment="CENTER_LEFT" spacing="8.0">
+	                        <Label fx:id="bmsirFloatingGreenLabel" text="%BMSIR_FLOATING_GREEN" />
+	                        <Spinner fx:id="bmsirFloatingGreen" editable="true" prefWidth="110.0" />
+	                    </HBox>
 	                    <HBox alignment="CENTER_LEFT" spacing="8.0">
 	                        <Label text="%BMSIR_BASE_SCROLL_SPEED" />
 	                        <Spinner fx:id="bmsirBaseScrollSpeed" editable="true" prefWidth="110.0" />

@@ -18,6 +18,9 @@ public final class ReplayLaneState {
     }
     public static boolean validConfig(PlayConfig config) {
         return config != null && Float.isFinite(config.getHispeed()) && config.getHispeed() > 0
+                && (!config.isBmsirFloatingHispeedEnabled()
+                    || (Float.isFinite(config.getBmsirFloatingHispeed())
+                        && Float.isFinite(config.getBmsirFloatingGreenFrames())))
                 && Float.isFinite(config.getLanecover())
                 && Float.isFinite(config.getLift()) && Float.isFinite(config.getHidden());
     }
@@ -47,6 +50,11 @@ public final class ReplayLaneState {
         target.setBmsirBaseScrollSpeed(source.getBmsirBaseScrollSpeed());
         target.setBmsirHispeedReferenceBpm(source.getBmsirHispeedReferenceBpm());
         target.setBmsirLr2HispeedFixReplayEnabled(source.getBmsirLr2HispeedFixReplayEnabled());
+        target.setBmsirFloatingHispeedEnabled(source.isBmsirFloatingHispeedEnabled());
+        target.setBmsirFloatingHispeed(source.getBmsirFloatingHispeed());
+        target.setBmsirFloatingGreenFrames(source.getBmsirFloatingGreenFrames());
+        target.setBmsirFloatingCoverVisible(source.isBmsirFloatingCoverVisible());
+        target.setBmsirFloatingSuddenLiftVisiblePixels(source.getBmsirFloatingSuddenLiftVisiblePixels());
     }
 
     public boolean sameDisplay(ReplayLaneState other) {
@@ -54,6 +62,11 @@ public final class ReplayLaneState {
         PlayConfig a = config, b = other.config;
         return a.getHispeed() == b.getHispeed() && a.getDuration() == b.getDuration()
                 && a.getFixhispeed() == b.getFixhispeed()
+                && a.isBmsirFloatingHispeedEnabled() == b.isBmsirFloatingHispeedEnabled()
+                && a.getBmsirFloatingHispeed() == b.getBmsirFloatingHispeed()
+                && a.getBmsirFloatingGreenFrames() == b.getBmsirFloatingGreenFrames()
+                && a.isBmsirFloatingCoverVisible() == b.isBmsirFloatingCoverVisible()
+                && a.getBmsirFloatingSuddenLiftVisiblePixels() == b.getBmsirFloatingSuddenLiftVisiblePixels()
                 && a.getLanecover() == b.getLanecover() && a.isEnablelanecover() == b.isEnablelanecover()
                 && a.getLift() == b.getLift() && a.isEnablelift() == b.isEnablelift()
                 && a.getHidden() == b.getHidden() && a.isEnablehidden() == b.isEnablehidden()

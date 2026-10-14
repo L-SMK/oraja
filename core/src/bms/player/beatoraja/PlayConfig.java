@@ -37,6 +37,24 @@ public class PlayConfig implements Cloneable {
 	/** Nullable replay snapshot; ordinary player configuration leaves this null. */
 	private Boolean bmsirLr2HispeedFixReplayEnabled;
 
+	/** Independent per-mode floating speed and unrounded visible time (60 Hz frames). */
+	private boolean bmsirFloatingHispeedEnabled;
+	private float bmsirFloatingHispeed = 2.0f;
+	private float bmsirFloatingGreenFrames = 30.0f;
+	private boolean bmsirFloatingCoverVisible = true;
+	private float bmsirFloatingSuddenLiftVisiblePixels = -1f;
+
+	public boolean isBmsirFloatingHispeedEnabled() { return bmsirFloatingHispeedEnabled; }
+	public void setBmsirFloatingHispeedEnabled(boolean enabled) { bmsirFloatingHispeedEnabled = enabled; }
+	public float getBmsirFloatingHispeed() { return bmsirFloatingHispeed; }
+	public void setBmsirFloatingHispeed(float value) { bmsirFloatingHispeed = value; }
+	public float getBmsirFloatingGreenFrames() { return bmsirFloatingGreenFrames; }
+	public void setBmsirFloatingGreenFrames(float value) { bmsirFloatingGreenFrames = value; }
+	public boolean isBmsirFloatingCoverVisible() { return bmsirFloatingCoverVisible; }
+	public void setBmsirFloatingCoverVisible(boolean visible) { bmsirFloatingCoverVisible = visible; }
+	public float getBmsirFloatingSuddenLiftVisiblePixels() { return bmsirFloatingSuddenLiftVisiblePixels; }
+	public void setBmsirFloatingSuddenLiftVisiblePixels(float value) { bmsirFloatingSuddenLiftVisiblePixels = value; }
+
 	/**
 	 * CONSTANT 使用
 	 */
@@ -331,6 +349,10 @@ public class PlayConfig implements Cloneable {
 	}
 
 	public void validate() {
+		bmsirFloatingHispeed = bms.player.beatoraja.play.BMSIRFloatingHispeed.clampMultiplier(bmsirFloatingHispeed);
+		if (!Float.isFinite(bmsirFloatingGreenFrames) || bmsirFloatingGreenFrames < 0f) {
+			bmsirFloatingGreenFrames = 30f;
+		}
 		hispeed = MathUtils.clamp(hispeed, HISPEED_MIN, HISPEED_MAX);
 		duration = MathUtils.clamp(duration, DURATION_MIN, DURATION_MAX);
 		bmsirBaseScrollSpeed = MathUtils.clamp(

@@ -1092,6 +1092,39 @@ public final class BMSIRArenaOverlay {
 		PlayConfig saved = config.getPlayConfig(modeId).getPlayconfig();
 		LaneRenderer live = BMSIRArenaClient.currentLaneRenderer(modeId);
 		LaneRenderer currentLive = BMSIRArenaClient.currentLaneRenderer(currentModeId);
+		ImGui.separator();
+		ImBoolean floating = new ImBoolean(saved.isBmsirFloatingHispeedEnabled());
+		ImGui.beginDisabled(currentLive != null);
+		if (ImGui.checkbox(t("フローティングハイスピード", "Floating HI-SPEED") + "##floating" + suffix, floating)) {
+			saved.setBmsirFloatingHispeedEnabled(floating.get());
+			saveSettingsOrWarn();
+		}
+		ImGui.endDisabled();
+		if (floating.get()) {
+			PlayConfig floatingConfig = live != null ? live.getPlayConfig() : saved;
+			ImFloat multiplier = new ImFloat(floatingConfig.getBmsirFloatingHispeed());
+			ImGui.setNextItemWidth(compact ? 120f : 180f);
+			if (ImGui.inputFloat(t("倍率", "Multiplier") + "##floating-multiplier" + suffix, multiplier)) {
+				float value = bms.player.beatoraja.play.BMSIRFloatingHispeed.clampMultiplier(multiplier.get());
+				saved.setBmsirFloatingHispeed(value);
+				if (live != null) live.setHispeed(value);
+				saveSettingsOrWarn();
+			}
+			ImInt green = new ImInt(bms.player.beatoraja.play.BMSIRFloatingHispeed.greenNumber(floatingConfig.getBmsirFloatingGreenFrames()));
+			ImGui.setNextItemWidth(compact ? 120f : 180f);
+			if (ImGui.inputInt(t("保存緑数字", "Saved green number") + "##floating-green" + suffix, green)) {
+				float frames = Math.max(10, Math.min(6000, green.get())) / 10f;
+				saved.setBmsirFloatingGreenFrames(frames);
+				if (live != null) {
+					floatingConfig.setBmsirFloatingGreenFrames(frames);
+					live.resetHispeed(live.getNowBPM());
+				}
+				saveSettingsOrWarn();
+			}
+			ImGui.textWrapped(t("倍率 0.50～10.00。START＋鍵盤 ±0.50。カバー操作で保存緑数字に戻ります。",
+					"Multiplier 0.50-10.00. START + keys: ±0.50. Cover adjustment restores the saved green number."));
+			return;
+		}
 		boolean enabled = currentLive != null
 				? currentLive.isBmsirLr2HispeedFixEnabled()
 				: config.isBmsirLr2HispeedFixEnabled();
