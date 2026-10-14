@@ -137,10 +137,23 @@ public class SkinLuaAccessor {
 
 	public StringProperty loadStringProperty(LuaFunction function) {
 		return new StringProperty() {
+			private LuaValue lastValue;
+			private String lastText;
 			@Override
 			public String get(MainState state) {
 				try {
-					return function.call().tojstring();
+					LuaValue value = function.call();
+					// Always execute the callback; only exact immutable strings can reuse decoding.
+					if (value.getClass() == LuaString.class && value == lastValue) return lastText;
+					String text = value.tojstring();
+					if (value.getClass() == LuaString.class && text.length() <= SkinLuaTextCache.MAX_LENGTH) {
+						lastValue = value;
+						lastText = text;
+					} else {
+						lastValue = null;
+						lastText = null;
+					}
+					return text;
 				} catch (RuntimeException e) {
 					logger.warn("Lua実行時の例外：{}", e.getMessage());
 					return "";
