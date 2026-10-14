@@ -23,6 +23,12 @@ OpenALでは未対応と表示し、設定値を保持します。変更は本�
 
 ## Current Version
 
+Version 0.4.14.111 preserves the 0.4.14.110 release lineage and adds the
+dedicated HI-SPEED tab, live speed-mode switching, BGA display toggling,
+settings-window cleanup, gauge/input/replay fixes, compatibility repairs,
+and Lua allocation reductions. Updates remain optional; plugin 0.0.79 and
+launcher 0.2.30 are retained. See [the test scope](docs/TEST_RELEASE_0.4.14.111.md).
+
 上流監査で残ったIR設定保持、音量正規化、ゲージ/トレーナー表示、BGA/旧BMS互換の
 9件を修正しました。解析が変わる可能性のある譜面は旧成績と新成績のローカル保存を分け、
 旧リプレイは記録時の解析で再生します。公開譜面ハッシュは保持します。
