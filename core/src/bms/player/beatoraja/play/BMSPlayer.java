@@ -1343,10 +1343,6 @@ public class BMSPlayer extends MainState {
 				if (timer.getNowTime(TIMER_FADEOUT) > skin.getFadeout()) {
 					main.getAudioProcessor().setGlobalPitch(1f);
 					resource.getBGAManager().stop();
-					if (endedAtLastNote && resource.mediaLoadFinished()) {
-						// No lingering BGM or keysounds on the result screen.
-						main.getAudioProcessor().stop((Note) null);
-					}
 
 					if (autoplay.mode == BMSPlayerMode.Mode.PLAY || autoplay.mode == BMSPlayerMode.Mode.REPLAY) {
 						resource.setScoreData(createScoreData());
