@@ -1080,21 +1080,16 @@ public final class BMSIRArenaOverlay {
         ImGui.separator();
         if (PlayConfig.HISPEED_MODE_FLOATING.equals(mode)) {
             ImInt green = new ImInt(bms.player.beatoraja.play.BMSIRFloatingHispeed.greenNumber(active.getBmsirFloatingGreenFrames()));
-            if (ImGui.inputInt(t("保存緑数字", "Saved green number") + suffix, green)) {
+            if (ImGui.inputInt(t("緑数字", "Green number") + suffix, green)) {
                 float frames = Math.max(10, Math.min(6000, green.get())) / 10f;
                 saved.setBmsirFloatingGreenFrames(frames);
                 if (live != null) { active.setBmsirFloatingGreenFrames(frames); live.resetHispeed(live.getNowBPM()); }
                 saveSettingsOrWarn();
             }
-            ImFloat multiplier = new ImFloat(active.getBmsirFloatingHispeed());
-            if (ImGui.inputFloat(t("倍率", "Multiplier") + suffix, multiplier)) {
-                float value = bms.player.beatoraja.play.BMSIRFloatingHispeed.clampMultiplier(multiplier.get());
-                saved.setBmsirFloatingHispeed(value);
-                if (live != null) live.setHispeed(value);
-                saveSettingsOrWarn();
-            }
-            ImGui.textWrapped(t("START＋黒鍵／白鍵：倍率 ±0.50。カバー操作で保存緑数字に戻ります。",
-                    "START + black/white keys: ±0.50. Cover adjustment restores the saved green number."));
+            ImGui.textDisabled(String.format(Locale.ROOT, t("倍率 %.2f（緑数字とBPMから自動）", "Multiplier %.2f (from green number and BPM)"),
+                    active.getBmsirFloatingHispeed()));
+            ImGui.textWrapped(t("曲開始・カバー操作で緑数字を保ちます。START＋黒鍵／白鍵は倍率±0.50相当で緑数字を変えます。",
+                    "Song start and cover moves keep the green number. START + black/white keys change it by a ±0.50 multiplier step."));
         } else {
             ImInt fix = new ImInt(active.getFixhispeed());
             if (ImGui.combo("HI-SPEED FIX" + suffix, fix, new String[]{"OFF", "START", "MAX", "MAIN", "MIN"})) {
