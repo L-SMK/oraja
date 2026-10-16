@@ -1,7 +1,6 @@
 package bms.player.beatoraja.nonstop;
 
 import bms.model.BMSModel;
-import bms.model.ChartInformation;
 import bms.player.beatoraja.MainController;
 import bms.player.beatoraja.PlayerResource;
 import bms.player.beatoraja.audio.BMSLoudnessAnalyzer;
@@ -141,12 +140,7 @@ public final class MixLibrary {
             }
         }
         Path path = Path.of(song.getPath());
-        BMSModel model;
-        synchronized (MixLibrary.class) {
-            model = track.random != null
-                    ? resource.loadBMSModel(new ChartInformation(path, lnmode, track.random))
-                    : resource.loadBMSModel(path, lnmode);
-        }
+        BMSModel model = resource.loadDetachedBMSModel(path, lnmode, track.random);
         if (model == null) {
             throw new IllegalStateException(text("譜面を読み込めません: ", "Could not load the chart: ") + track.displayTitle());
         }

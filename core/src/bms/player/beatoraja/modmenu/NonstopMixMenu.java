@@ -261,6 +261,15 @@ public final class NonstopMixMenu {
         if (main == null) {
             return;
         }
+        if (!(main.getCurrentState() instanceof MusicSelector)) {
+            // charts are loaded through the player resource; never while a chart is being played
+            ImGui.setNextWindowSize(360, 90, ImGuiCond.FirstUseEver);
+            if (ImGui.begin("NONSTOP MIX###nonstop-mix", open, ImGuiWindowFlags.None)) {
+                ImGui.textWrapped(t("編集は選曲画面で行えます。", "The editor is available in Music Select."));
+            }
+            ImGui.end();
+            return;
+        }
         ensurePlan();
         pollJobs();
         ImGui.setNextWindowSize(1000, 680, ImGuiCond.FirstUseEver);

@@ -257,6 +257,22 @@ public final class PlayerResource {
 		return loadBMSModel(SongResources.fromPath(f), lnmode, null);
 	}
 
+	private static final ThreadLocal<Boolean> DETACHED_LOAD = ThreadLocal.withInitial(() -> Boolean.FALSE);
+
+	/**
+	 * Loads and prepares a chart exactly like play does, without touching the
+	 * state of the chart that is currently selected or played. Safe to call from
+	 * a background thread (NONSTOP MIX, Issue #535).
+	 */
+	public BMSModel loadDetachedBMSModel(Path f, int lnmode, int[] selectedRandom) {
+		DETACHED_LOAD.set(Boolean.TRUE);
+		try {
+			return loadBMSModel(SongResources.fromPath(f), lnmode, selectedRandom);
+		} finally {
+			DETACHED_LOAD.remove();
+		}
+	}
+
 	public BMSModel loadBMSModel(int[] selectedRandom) {
 		if(model != null) {
 			ChartInformation info = model.getChartInformation();
@@ -357,7 +373,10 @@ public final class PlayerResource {
 			model.setFromOSU(true);
 		}
 
-		marginTime = BMSModelUtils.setStartNoteTime(model, 1000);
+		long margin = BMSModelUtils.setStartNoteTime(model, 1000);
+		if (!DETACHED_LOAD.get()) {
+			marginTime = margin;
+		}
 		BMSPlayerRule.validate(model);
 
 		// 地雷ノートに爆発音が定義されていない場合、デフォルト爆発音をセットする
