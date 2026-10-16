@@ -134,17 +134,23 @@ public final class MixPlan {
             if (i == 0) {
                 cursor = in > 0 ? LEAD_IN_MS : in;
             } else {
-                MixTransition join = transitions.get(i - 1);
-                cursor = end[i - 1] - join.placementOverlapMs();
+                // a join can never reach back before the start of the previous song
+                cursor = end[i - 1] - overlapMs(i - 1, start, end);
             }
             start[i] = cursor;
             offset[i] = cursor - in;
             end[i] = cursor + Math.max(0L, out - in);
             if (i > 0) {
-                handoff[i - 1] = start[i] + transitions.get(i - 1).effectiveHandoffMs();
+                long overlap = Math.max(0L, overlapMs(i - 1, start, end));
+                handoff[i - 1] = start[i] + Math.min(overlap, transitions.get(i - 1).effectiveHandoffMs());
             }
         }
         return new Layout(start, end, offset, handoff);
+    }
+
+    private long overlapMs(int join, long[] start, long[] end) {
+        long overlap = transitions.get(join).placementOverlapMs();
+        return Math.min(overlap, Math.max(0L, end[join] - start[join]));
     }
 
     /**

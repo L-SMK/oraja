@@ -553,8 +553,14 @@ public final class MixCompiler {
     }
 
     private static Note background(Note note, int offset, int count, int defaultMine) {
-        return new NormalNote(remap(note.getWav(), offset, count, defaultMine),
+        Note bg = new NormalNote(remap(note.getWav(), offset, count, defaultMine),
                 note.getMicroStarttime(), note.getMicroDuration());
+        // layered sounds of a note that is not played stay with it in the background
+        for (Note layered : note.getLayeredNotes()) {
+            bg.addLayeredNote(new NormalNote(remap(layered.getWav(), offset, count, defaultMine),
+                    layered.getMicroStarttime(), layered.getMicroDuration()));
+        }
+        return bg;
     }
 
     private static void copyLayered(Note source, Note target, int offset, int count, int defaultMine,

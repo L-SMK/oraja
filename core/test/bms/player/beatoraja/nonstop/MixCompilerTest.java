@@ -196,6 +196,23 @@ class MixCompilerTest {
         assertTrue(mix.sounds(0).length > 0);
     }
 
+    @Test
+    void anOverlapLongerThanTheSongNeverReachesBeforeTheSet() {
+        BMSModel a = chart(120, "");
+        MixPlan plan = plan(2);
+        plan.tracks.get(0).inMs = 20000;
+        plan.tracks.get(0).outMs = 24000;   // a 4-second part
+        plan.transitions.get(0).overlapMs = 30000;
+        plan.transitions.get(0).handoffMs = 25000;
+        CompiledMix mix = MixCompiler.compile(plan, List.of(source(a, "a"), source(a, "b")));
+        MixPlan.Layout layout = mix.layout();
+        assertTrue(layout.start()[1] >= layout.start()[0]);
+        assertTrue(layout.handoff()[0] <= layout.end()[0]);
+        for (TimeLine tl : mix.model().getAllTimeLines()) {
+            assertTrue(tl.getMicroTime() >= 0);
+        }
+    }
+
     static int soundCount(BMSModel model) {
         int count = 0;
         for (TimeLine tl : model.getAllTimeLines()) {
