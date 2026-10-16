@@ -1157,6 +1157,7 @@ public class MainController {
 		MiscSettingMenu.setMain(this);
 		HandCameraMenu.setMain(this);
 		FunctionKeyMenu.setMain(this);
+		bms.player.beatoraja.modmenu.NonstopMixMenu.setMain(this);
 		if (initializeArena) {
 			BMSIRArenaClient.initialize(this);
 		}

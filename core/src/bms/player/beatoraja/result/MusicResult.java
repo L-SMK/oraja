@@ -43,6 +43,7 @@ public class MusicResult extends AbstractResult {
 
 	static boolean shouldPersistScore(BMSModel model, String workDirectory) {
 		return !bms.player.beatoraja.pattern.BMSIRSevenToNineModifier.isApplied(model)
+				&& !bms.player.beatoraja.nonstop.MixRuntime.isMix(model)
 				&& !BMSIRTestPlayFolder.contains(model, workDirectory);
 	}
 

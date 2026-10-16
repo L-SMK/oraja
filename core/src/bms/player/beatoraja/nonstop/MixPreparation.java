@@ -26,6 +26,7 @@ public final class MixPreparation {
     private volatile CompiledMix result;
     private volatile List<MixCompiler.Source> sources;
     private volatile List<MixLibrary.Loaded> loaded;
+    private java.util.function.BiConsumer<MixPlan, long[]> transform;
 
     private MixPreparation(MixPlan plan, MixLibrary library) {
         this.plan = plan.copy();
@@ -34,7 +35,17 @@ public final class MixPreparation {
 
     /** Starts preparing a snapshot of {@code plan}; later edits do not affect it. */
     public static MixPreparation start(MixPlan plan, MixLibrary library, boolean loudness) {
+        return start(plan, library, loudness, null);
+    }
+
+    /**
+     * @param transform adjusts the loaded snapshot before compiling (e.g. cutting a
+     *                  preview out of the set); receives each track's chart end
+     */
+    public static MixPreparation start(MixPlan plan, MixLibrary library, boolean loudness,
+            java.util.function.BiConsumer<MixPlan, long[]> transform) {
         MixPreparation job = new MixPreparation(plan, library);
+        job.transform = transform;
         Thread worker = new Thread(() -> job.run(loudness), "nonstop-mix-prepare");
         worker.setDaemon(true);
         worker.start();
@@ -54,6 +65,13 @@ public final class MixPreparation {
                 progress = i + 1;
             }
             loaded = songs;
+            if (transform != null) {
+                long[] ends = new long[songs.size()];
+                for (int i = 0; i < ends.length; i++) {
+                    ends[i] = songs.get(i).analysis().chartEnd;
+                }
+                transform.accept(plan, ends);
+            }
             double[] gains = new double[songs.size()];
             java.util.Arrays.fill(gains, 1.0);
             if (loudness && plan.normalizeLoudness) {
