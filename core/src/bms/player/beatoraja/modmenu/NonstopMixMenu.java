@@ -140,6 +140,9 @@ public final class NonstopMixMenu {
     private static volatile List<MixIrClient.Score> irRanking;
     private static volatile String irRankingFor = "";
 
+    // records are read from disk at most every few seconds
+    private static final Map<String, Object[]> RECORDS = new HashMap<>();
+
     // result
     private static MixResult shownResult;
     private static final ImBoolean SHOW_RESULT = new ImBoolean(false);
@@ -178,20 +181,26 @@ public final class NonstopMixMenu {
 
     /** Records the current state before an edit, so it can be undone. */
     private static void edit() {
-        UNDO.push(MixJson.toText(plan, true));
-        while (UNDO.size() > HISTORY_LIMIT) {
-            UNDO.removeLast();
+        long now = System.currentTimeMillis();
+        // a slider drag or typing is one step in the history, not one per frame
+        if (now - lastEdit > 400 || UNDO.isEmpty()) {
+            UNDO.push(MixJson.toText(plan, true));
+            while (UNDO.size() > HISTORY_LIMIT) {
+                UNDO.removeLast();
+            }
         }
         REDO.clear();
         dirty = true;
-        lastEdit = System.currentTimeMillis();
+        lastEdit = now;
         checkWanted = true;
     }
 
     private static void afterEdit() {
         plan.updatedAt = System.currentTimeMillis();
-        store().saveDraft(plan);
+        draftPending = true;
     }
+
+    private static boolean draftPending;
 
     private static void undo() {
         if (UNDO.isEmpty()) {
@@ -1436,7 +1445,7 @@ public final class NonstopMixMenu {
                 ImGui.tableNextColumn();
                 ImGui.text(new SimpleDateFormat("yyyy/MM/dd HH:mm").format(new Date(set.updatedAt)));
                 ImGui.tableNextColumn();
-                MixResult best = store().best(MixJson.playIdentity(set));
+                MixResult best = best(records(MixJson.playIdentity(set)));
                 ImGui.text(best == null ? "-" : String.format(Locale.ROOT, "%s %.1f%%", clearName(best.clear), best.rate()));
                 ImGui.tableNextColumn();
                 if (ImGui.smallButton(t("開く", "Open"))) {
@@ -1740,7 +1749,7 @@ public final class NonstopMixMenu {
             return;
         }
         String identity = MixJson.playIdentity(plan);
-        List<MixResult> records = store().records(identity);
+        List<MixResult> records = records(identity);
         ImGui.textDisabled(t("記録はセットの中身（曲・区間・つなぎ・判定）ごとに分かれます。名前や説明を変えても残ります。",
                 "Records belong to the set's content (songs, parts, joins, judge); renaming keeps them."));
         if (records.isEmpty()) {
@@ -1758,6 +1767,31 @@ public final class NonstopMixMenu {
             }
             ImGui.popID();
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<MixResult> records(String identity) {
+        long now = System.currentTimeMillis();
+        Object[] cached = RECORDS.get(identity);
+        if (cached != null && now - (Long) cached[1] < 3000) {
+            return (List<MixResult>) cached[0];
+        }
+        List<MixResult> records = store().records(identity);
+        if (RECORDS.size() > 256) {
+            RECORDS.clear();
+        }
+        RECORDS.put(identity, new Object[] {records, now});
+        return records;
+    }
+
+    private static MixResult best(List<MixResult> records) {
+        MixResult best = null;
+        for (MixResult result : records) {
+            if (best == null || result.clear > best.clear || result.clear == best.clear && result.exScore > best.exScore) {
+                best = result;
+            }
+        }
+        return best;
     }
 
     // ------------------------------------------------------------------ background
@@ -1781,6 +1815,10 @@ public final class NonstopMixMenu {
     }
 
     private static void pollJobs() {
+        if (draftPending && System.currentTimeMillis() - lastEdit > 1000) {
+            draftPending = false;
+            store().saveDraft(plan);
+        }
         MixPreparation job = preparation;
         if (job != null) {
             switch (job.state()) {

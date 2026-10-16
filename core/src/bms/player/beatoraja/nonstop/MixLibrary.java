@@ -50,8 +50,30 @@ public final class MixLibrary {
         return main;
     }
 
-    /** The local song of a track, or null when the player does not have it. */
+    private static final long FIND_TTL_MS = 5_000L;
+    private final Map<String, Object[]> found = new java.util.HashMap<>();
+
+    /** The local song of a track, or null when the player does not have it. Cached briefly for the overlay. */
     public SongData find(MixTrack track) {
+        String key = track.sha256 + "|" + track.md5;
+        long now = System.currentTimeMillis();
+        synchronized (found) {
+            Object[] hit = found.get(key);
+            if (hit != null && now - (Long) hit[1] < FIND_TTL_MS) {
+                return (SongData) hit[0];
+            }
+        }
+        SongData song = lookup(track);
+        synchronized (found) {
+            if (found.size() > 4096) {
+                found.clear();
+            }
+            found.put(key, new Object[] {song, now});
+        }
+        return song;
+    }
+
+    private SongData lookup(MixTrack track) {
         if (main == null || main.getSongDatabase() == null) {
             return null;
         }

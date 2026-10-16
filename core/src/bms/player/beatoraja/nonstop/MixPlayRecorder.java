@@ -53,7 +53,7 @@ public final class MixPlayRecorder {
             logger.warn("NONSTOP MIX record could not be saved: {}", e.getMessage());
             ImGuiNotify.warning(text("NONSTOP MIXの記録を保存できませんでした", "Could not save the NONSTOP MIX record"));
         }
-        if (!result.irId.isEmpty()) {
+        if (!result.irId.isEmpty() && result.finished) {
             MixIrClient.submitScoreAsync(main, mix, result);
         }
     }
