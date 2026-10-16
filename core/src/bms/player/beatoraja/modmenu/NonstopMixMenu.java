@@ -426,6 +426,11 @@ public final class NonstopMixMenu {
             ImGui.sameLine();
             ImGui.textDisabled(t("（未保存）", "(unsaved)"));
         }
+        if (plan.tracks.size() > 12) {
+            ImGui.textColored(WARNING[0], WARNING[1], WARNING[2], WARNING[3],
+                    t("曲数が多いセットは全曲の音を最初に読み込むため、メモリを多く使い開始まで時間がかかります",
+                            "Large sets load every song's sounds up front; they use a lot of memory and take longer to start"));
+        }
         renderPreparation();
     }
 
