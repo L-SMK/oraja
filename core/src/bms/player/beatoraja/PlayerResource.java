@@ -181,8 +181,35 @@ public final class PlayerResource {
 		failMeasure = Double.NaN;
 	}
 
+	/**
+	 * Installs a compiled NONSTOP MIX set (Issue #535). The merged chart is
+	 * played like an ordinary chart; its sounds and images resolve through the
+	 * set's virtual resource into each song's own folder.
+	 */
+	public boolean setNonstopMix(bms.player.beatoraja.nonstop.MixRuntime.Session session, BMSPlayerMode mode) {
+		BMSModel merged = session.mix().model();
+		if (merged == null || merged.getAllTimeLines().length == 0) {
+			return false;
+		}
+		this.mode = mode;
+		replay = new ReplayData();
+		chartResource = session.mix().resource();
+		model = merged;
+		marginTime = 0;
+		songdata = new SongData(merged, false);
+		orgmode = merged.getMode();
+		bms.player.beatoraja.nonstop.MixRuntime.activate(session);
+		bmsresource.setBMSFile(merged, chartResource, config, mode);
+		setTablename("NONSTOP MIX");
+		setTablelevel("");
+		// loudness is matched per song while compiling; the merged chart is not analysed again
+		analysisTask = null;
+		return true;
+	}
+
 	public boolean setBMSFile(final Path f, BMSPlayerMode mode) {
 		// TODO play mode, リプレイデータでの読み込み分岐をここで行う
+		bms.player.beatoraja.nonstop.MixRuntime.deactivate();
 		this.mode = mode;
 		replay = new ReplayData();
 		chartResource = SongResources.fromPath(f);
@@ -507,7 +534,13 @@ public final class PlayerResource {
 	}
 
 	public void reloadBMSFile() {
-		if (model != null) {
+		if (bms.player.beatoraja.nonstop.MixRuntime.isMix(model)) {
+			// a retry needs fresh notes; the set is rebuilt from the already loaded songs
+			BMSModel rebuilt = bms.player.beatoraja.nonstop.MixRuntime.recompile();
+			if (rebuilt != null) {
+				model = rebuilt;
+			}
+		} else if (model != null) {
 			model = loadBMSModel(Paths.get(model.getPath()), pconfig.getLnmode());
 		}
 		final String name = tablename;

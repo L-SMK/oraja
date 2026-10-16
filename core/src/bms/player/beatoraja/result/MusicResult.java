@@ -86,7 +86,11 @@ public class MusicResult extends AbstractResult {
 		}
 
 		updateScoreDatabase();
-		if (!bms.player.beatoraja.pattern.BMSIRSevenToNineModifier.isApplied(resource.getBMSModel())) {
+		final boolean nonstopMix = bms.player.beatoraja.nonstop.MixRuntime.isMix(resource.getBMSModel());
+		if (nonstopMix) {
+			bms.player.beatoraja.nonstop.MixPlayRecorder.record(main, resource);
+		}
+		if (!nonstopMix && !bms.player.beatoraja.pattern.BMSIRSevenToNineModifier.isApplied(resource.getBMSModel())) {
 			BMSIROrajaHelperBridge.publishResult(
 				resource.getSongdata(),
 				resource.getReplayData(),
@@ -95,7 +99,7 @@ public class MusicResult extends AbstractResult {
 			);
 		}
 		// リプレイの自動保存
-		if (resource.getPlayMode().mode == BMSPlayerMode.Mode.PLAY && !resource.isFreqOn()) {
+		if (resource.getPlayMode().mode == BMSPlayerMode.Mode.PLAY && !resource.isFreqOn() && !nonstopMix) {
 			for (int i = 0; i < REPLAY_SIZE; i++) {
 				if (ReplayAutoSaveConstraint.get(resource.getPlayerConfig().getAutoSaveReplay()[i]).isQualified(oldscore,
 						resource.getScoreData())) {

@@ -561,6 +561,11 @@ public class MainController {
 		return offset[index];
 	}
 
+	/** Loudness analyzer shared with NONSTOP MIX volume matching; null before startup finishes. */
+	public bms.player.beatoraja.audio.BMSLoudnessAnalyzer getLoudnessAnalyzer() {
+		return loudnessAnalyzer;
+	}
+
 	public SongDatabaseAccessor getSongDatabase() {
 		return MainLoader.getScoreDatabaseAccessor();
 	}
