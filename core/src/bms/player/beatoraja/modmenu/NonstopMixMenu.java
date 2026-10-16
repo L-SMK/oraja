@@ -695,9 +695,31 @@ public final class NonstopMixMenu {
         return false;
     }
 
+    private static final Mode[] MODES = {Mode.BEAT_7K, Mode.BEAT_14K, Mode.BEAT_5K, Mode.BEAT_10K, Mode.POPN_9K};
+
     private static void renderSetSettings() {
         ImGui.separator();
         ImGui.text(t("セットの設定", "Set options"));
+        ImInt mode = new ImInt(0);
+        String[] modeNames = new String[MODES.length];
+        for (int i = 0; i < MODES.length; i++) {
+            modeNames[i] = MODES[i].hint;
+            if (MODES[i] == plan.mode) {
+                mode.set(i);
+            }
+        }
+        ImGui.beginDisabled(!plan.tracks.isEmpty());
+        ImGui.setNextItemWidth(220);
+        if (ImGui.combo(t("鍵盤モード", "Key mode") + "##nm-mode", mode, modeNames)) {
+            edit();
+            plan.mode = MODES[mode.get()];
+            afterEdit();
+        }
+        ImGui.endDisabled();
+        if (!plan.tracks.isEmpty()) {
+            ImGui.sameLine();
+            ImGui.textDisabled(t("（曲が入っている間は変えられません）", "(fixed while the set has songs)"));
+        }
         ImInt judge = new ImInt(plan.judge.ordinal());
         String[] judges = {t("とてもやさしい", "Very easy"), t("やさしい", "Easy"), t("ふつう", "Normal"), t("むずかしい", "Hard"),
                 t("とてもむずかしい", "Very hard"), t("曲の平均", "Average of songs"), t("一番きびしい曲", "Strictest song")};
