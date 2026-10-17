@@ -51,6 +51,32 @@ class MixStoreTest {
     }
 
     @Test
+    void editorOpensTheNewestSavedSetWhenTheDraftIsEmpty() throws Exception {
+        MixStore store = new MixStore(directory.resolve("nonstopmix"));
+        assertNull(store.openingPlan());
+        MixPlan empty = new MixPlan();
+        store.saveSet(empty);
+        store.saveDraft(empty);
+        assertEquals(empty.id, store.openingPlan().id, "only empty sets: the draft stays");
+        MixPlan saved = MixJsonTest.sample();
+        store.saveSet(saved);
+        assertEquals(saved.id, store.openingPlan().id, "an empty draft must not hide the saved work");
+        MixPlan draft = MixJsonTest.sample();
+        store.saveDraft(draft);
+        assertEquals(draft.id, store.openingPlan().id, "a draft with songs is the work in progress");
+    }
+
+    @Test
+    void wholeNewGenerationBecomesANewSet() {
+        MixPlan current = MixJsonTest.sample();
+        assertTrue(MixGenerator.makesNewSet(current, MixGenerator.Scope.EVERYTHING));
+        assertFalse(MixGenerator.makesNewSet(current, MixGenerator.Scope.ORDER_AND_JOINS));
+        assertFalse(MixGenerator.makesNewSet(current, MixGenerator.Scope.JOINS_ONLY));
+        assertFalse(MixGenerator.makesNewSet(new MixPlan(), MixGenerator.Scope.EVERYTHING),
+                "an empty set is simply filled");
+    }
+
+    @Test
     void perTrackResultsFollowTheNotesOfEachSong() {
         BMSModel a = MixCompilerTest.chart(120, "");
         MixPlan plan = MixCompilerTest.plan(2);
