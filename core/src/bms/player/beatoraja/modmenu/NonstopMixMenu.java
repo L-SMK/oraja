@@ -13,6 +13,7 @@ import bms.player.beatoraja.nonstop.MixIrClient;
 import bms.player.beatoraja.nonstop.MixJoinPlanner;
 import bms.player.beatoraja.nonstop.MixJson;
 import bms.player.beatoraja.nonstop.MixLibrary;
+import bms.player.beatoraja.nonstop.MixLoad;
 import bms.player.beatoraja.nonstop.MixMainThread;
 import bms.player.beatoraja.nonstop.MixPlan;
 import bms.player.beatoraja.nonstop.MixPreparation;
@@ -95,6 +96,12 @@ public final class NonstopMixMenu {
     private static String pendingTitle = "";
     private static List<MixCompiler.Issue> issues = List.of();
     private static String issuesFor = "";
+    /** BGA load of the last compiled check (Issue #556); null until a check ran. */
+    private static MixLoad load;
+    /** A prepared start that waits for the heavy-set question. */
+    private record HeavyStart(MixRuntime.Session session, BMSPlayerMode mode, Pending kind) {
+    }
+    private static HeavyStart heavyStart;
     private static long lastEdit;
     private static boolean checkWanted;
     private static final Map<String, MixTrackAnalysis> ANALYSES = new HashMap<>();
@@ -242,6 +249,7 @@ public final class NonstopMixMenu {
         selectedJoin = -1;
         issues = List.of();
         issuesFor = "";
+        load = null;
         checkWanted = true;
         chartShiftNote = "";
         syncTextFields();
@@ -278,6 +286,7 @@ public final class NonstopMixMenu {
         ImGui.setNextWindowPos(ImGuiRenderer.windowWidth * 0.08f, ImGuiRenderer.windowHeight * 0.06f, ImGuiCond.FirstUseEver);
         if (ImGui.begin("NONSTOP MIX###nonstop-mix", open, ImGuiWindowFlags.None)) {
             renderHeader();
+            renderHeavyStart();
             ImGui.separator();
             if (ImGui.beginTabBar("##nonstop-mix-tabs")) {
                 if (ImGui.beginTabItem(t("セット編集", "Edit set") + "##nm-edit")) {
@@ -432,6 +441,19 @@ public final class NonstopMixMenu {
             ImGui.textColored(WARNING[0], WARNING[1], WARNING[2], WARNING[3],
                     t("曲数が多いセットは全曲の音を最初に読み込むため、メモリを多く使い開始まで時間がかかります",
                             "Large sets load every song's sounds up front; they use a lot of memory and take longer to start"));
+        }
+        MixLoad current = load;
+        if (current != null && current.suggestNoBga(plan.noBga)) {
+            ImGui.textColored(WARNING[0], WARNING[1], WARNING[2], WARNING[3],
+                    String.format(Locale.ROOT, t("長い・重いセットです（%s）。BGAは全曲分を開始時に読み込むため、カクつきや画像の欠けが起きることがあります",
+                            "Long or heavy set (%s). Every song's BGA is loaded at start; it may stutter or drop pictures"),
+                            t(current.reason(true), current.reason(false))));
+            ImGui.sameLine();
+            if (ImGui.smallButton(t("BGAを使わない", "Turn BGA off") + "##nm-nobga-quick")) {
+                edit();
+                plan.noBga = true;
+                afterEdit();
+            }
         }
         renderPreparation();
     }
@@ -747,6 +769,17 @@ public final class NonstopMixMenu {
         ImGui.sameLine();
         ImGuiRenderer.helpMarker(t("初回は曲ごとに音量解析をするため、開始まで時間がかかります。結果は保存され次回から速くなります。",
                 "The first time, each song is analysed before the set starts; results are cached."));
+        ImBoolean noBga = new ImBoolean(plan.noBga);
+        if (ImGui.checkbox(t("BGAを使わない", "Play without BGA") + "##nm-nobga", noBga)) {
+            edit();
+            plan.noBga = noBga.get();
+            afterEdit();
+        }
+        ImGui.sameLine();
+        ImGuiRenderer.helpMarker(t("BGA・レイヤー・背景画像を読み込まずに遊びます。BGAは全曲分を開始時に読み込むため、長いセットや動画の多いセットで"
+                        + "メモリ不足・カクつき・画像の欠けを防げます。記録は同じセットとして残ります。",
+                "Plays without BGA, layers and the background image. Every song's BGA is loaded at start, so this avoids memory use,"
+                        + " stutter and missing pictures in long or movie-heavy sets. Records stay with the same set."));
         renderChartShift();
         ImGui.text(t("説明（IR公開時に表示）", "Description (shown on IR)"));
         if (ImGui.inputTextMultiline("##nm-description", DESCRIPTION, Math.max(200, ImGui.getContentRegionAvailX()), 70)) {
@@ -2006,6 +2039,7 @@ public final class NonstopMixMenu {
         if (kind == Pending.CHECK || kind == Pending.PLAY) {
             issues = mix.issues();
             issuesFor = MixJson.playIdentity(job.plan());
+            load = mix.load();
             // #RANDOM branches drawn while loading are written back so the set stays the same
             copyRandoms(job.plan());
         }
@@ -2020,6 +2054,52 @@ public final class NonstopMixMenu {
         MixRuntime.Kind runtimeKind = kind == Pending.PLAY ? MixRuntime.Kind.FULL : MixRuntime.Kind.PREVIEW;
         BMSPlayerMode mode = kind == Pending.TRY || kind == Pending.PLAY ? BMSPlayerMode.PLAY : BMSPlayerMode.AUTOPLAY;
         MixRuntime.Session session = new MixRuntime.Session(mix, job.sources(), job.plan(), runtimeKind, pendingTitle);
+        if ((kind == Pending.PLAY || kind == Pending.AUTOPLAY_SET) && mix.load().suggestNoBga(job.plan().noBga)) {
+            // the whole set's BGA would be loaded at once: ask before starting
+            heavyStart = new HeavyStart(session, mode, kind);
+            return;
+        }
+        launch(session, mode, kind);
+    }
+
+    private static void renderHeavyStart() {
+        HeavyStart waiting = heavyStart;
+        if (waiting == null) {
+            return;
+        }
+        String id = t("長いセットの確認", "Long set") + "###nm-heavy-start";
+        if (!ImGui.isPopupOpen(id)) {
+            ImGui.openPopup(id);
+        }
+        if (ImGui.beginPopupModal(id, ImGuiWindowFlags.AlwaysAutoResize)) {
+            MixLoad heavy = waiting.session().mix().load();
+            ImGui.text(t("長い・重いセットです: ", "Long or heavy set: ") + t(heavy.reason(true), heavy.reason(false)));
+            ImGui.textWrapped(t("BGAは全曲分を開始時に読み込むため、メモリ不足・カクつき・画像の欠けが起きることがあります。",
+                    "Every song's BGA is loaded at start; it may run out of memory, stutter or drop pictures."));
+            if (ImGui.button(t("BGAを使わずに開始", "Start without BGA") + "##nm-heavy-nobga")) {
+                heavyStart = null;
+                ImGui.closeCurrentPopup();
+                edit();
+                plan.noBga = true;
+                afterEdit();
+                prepare(plan, waiting.kind(), null, waiting.session().title());
+            }
+            ImGui.sameLine();
+            if (ImGui.button(t("このまま開始", "Start with BGA") + "##nm-heavy-keep")) {
+                heavyStart = null;
+                ImGui.closeCurrentPopup();
+                launch(waiting.session(), waiting.mode(), waiting.kind());
+            }
+            ImGui.sameLine();
+            if (ImGui.button(t("やめる", "Cancel") + "##nm-heavy-cancel")) {
+                heavyStart = null;
+                ImGui.closeCurrentPopup();
+            }
+            ImGui.endPopup();
+        }
+    }
+
+    private static void launch(MixRuntime.Session session, BMSPlayerMode mode, Pending kind) {
         if (dirty && kind == Pending.PLAY) {
             saveQuietly();
         }
