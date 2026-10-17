@@ -40,7 +40,15 @@ public final class MixGenerator {
         public MixTrack reference;
         public int rangeFrom;
         public int rangeTo;
+        /** Sets generated recently in this session, newest last; their songs are used less. */
+        public List<MixPlan> recentSets = List.of();
+        /** Saved sets, read on the worker thread; their songs are used a little less. */
+        public java.util.function.Supplier<List<MixPlan>> savedSets = List::of;
     }
+
+    /** Extra cost for a song from a recently generated set, and from a saved set. */
+    static final double RECENT_PENALTY = 0.8;
+    static final double SAVED_PENALTY = 0.35;
 
     public enum State { RUNNING, DONE, FAILED, CANCELLED }
 
@@ -301,6 +309,16 @@ public final class MixGenerator {
             reference = candidate(request.reference, library, levels);
             existing.put(reference, request.reference.copy());
         }
+        if (request.scope == Scope.EVERYTHING || request.scope == Scope.RANGE) {
+            List<MixPlan> saved;
+            try {
+                saved = request.savedSets.get();
+            } catch (RuntimeException e) {
+                logger.warn("NONSTOP MIX: could not read saved sets", e);
+                saved = List.of();
+            }
+            settings.recentSongs = recentSongs(request.recentSets, saved);
+        }
         if (request.scope == Scope.EVERYTHING && pool.size() < 3) {
             notes.add(text("条件に合う曲が少なすぎます", "Very few songs match the conditions"));
         }
@@ -323,6 +341,26 @@ public final class MixGenerator {
             tracks.add(track);
         }
         return tracks;
+    }
+
+    /** Song keys of recent and saved sets with their extra cost; a recent set outweighs a saved one. */
+    static java.util.Map<String, Double> recentSongs(List<MixPlan> recent, List<MixPlan> saved) {
+        java.util.Map<String, Double> penalties = new java.util.HashMap<>();
+        if (saved != null) {
+            for (MixPlan set : saved) {
+                for (MixTrack track : set.tracks) {
+                    penalties.merge(MixSequencer.songKey(track.title, track.artist), SAVED_PENALTY, Math::max);
+                }
+            }
+        }
+        if (recent != null) {
+            for (MixPlan set : recent) {
+                for (MixTrack track : set.tracks) {
+                    penalties.merge(MixSequencer.songKey(track.title, track.artist), RECENT_PENALTY, Math::max);
+                }
+            }
+        }
+        return penalties;
     }
 
     private static MixSequencer.Candidate candidate(MixTrack track, MixLibrary library, Difficulties levels) {

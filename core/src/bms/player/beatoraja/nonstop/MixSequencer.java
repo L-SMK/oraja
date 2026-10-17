@@ -25,7 +25,7 @@ public final class MixSequencer {
 
         /** Title and artist without chart decorations, used to avoid the same song twice. */
         public String songKey() {
-            return normalizeTitle(title) + "|" + normalizeArtist(artist);
+            return MixSequencer.songKey(title, artist);
         }
 
         /** Folder of the chart file; charts of one song share it. Empty when unknown. */
@@ -43,6 +43,11 @@ public final class MixSequencer {
             String folder = folderKey();
             return folder.isEmpty() ? List.of("t:" + songKey()) : List.of("t:" + songKey(), "f:" + folder);
         }
+    }
+
+    /** Title and artist without chart decorations. */
+    public static String songKey(String title, String artist) {
+        return normalizeTitle(title) + "|" + normalizeArtist(artist);
     }
 
     static String normalizeTitle(String title) {
@@ -108,6 +113,12 @@ public final class MixSequencer {
         /** Treat half and double tempo as compatible. */
         public boolean halfDouble = true;
         public long seed = System.nanoTime();
+        /** Broad genre family the set follows instead of {@link #genre} (null: none). */
+        public MixGenreFamily genreFamily;
+        /** Extra cost per song key (see {@link Candidate#songKey()}) for songs of recent sets. */
+        public java.util.Map<String, Double> recentSongs = java.util.Map.of();
+        /** Random cost added per candidate so runs differ. */
+        public double jitter = 0.9;
         public int beamWidth = 24;
         public int maxTracks = 40;
         /** How much of each song is used on average (for the length estimate). */
@@ -127,6 +138,9 @@ public final class MixSequencer {
             copy.tempoTolerance = tempoTolerance;
             copy.halfDouble = halfDouble;
             copy.seed = seed;
+            copy.genreFamily = genreFamily;
+            copy.recentSongs = recentSongs;
+            copy.jitter = jitter;
             copy.beamWidth = beamWidth;
             copy.maxTracks = maxTracks;
             copy.segmentMs = segmentMs;
@@ -175,7 +189,11 @@ public final class MixSequencer {
             if (candidate.lengthMs() > 0 && candidate.lengthMs() < 30_000L) {
                 continue;
             }
-            if (settings.genreRule == GenreRule.STRICT && !referenceGenre.isBlank()
+            if (settings.genreRule == GenreRule.STRICT && settings.genreFamily != null
+                    && !settings.genreFamily.matches(candidate.genre())) {
+                continue;
+            }
+            if (settings.genreRule == GenreRule.STRICT && settings.genreFamily == null && !referenceGenre.isBlank()
                     && !normalizeGenre(candidate.genre()).equals(normalizeGenre(referenceGenre))) {
                 continue;
             }
@@ -191,8 +209,10 @@ public final class MixSequencer {
                 Math.min(settings.maxDifficulty, maxDifficulty(usable))};
         double[] jitter = new double[usable.size()];
         for (int i = 0; i < jitter.length; i++) {
-            jitter[i] = random.nextDouble() * 0.35;
+            jitter[i] = random.nextDouble() * Math.max(0, settings.jitter);
         }
+        Candidate opener = first != null || fixedAt(fixed, 0) != null ? null
+                : pickOpener(usable, jitter, referenceGenre, settings, levels, random);
 
         List<State> beam = new ArrayList<>();
         beam.add(new State(List.of(), Set.of(), 0, 0));
@@ -202,13 +222,14 @@ public final class MixSequencer {
             List<State> next = new ArrayList<>();
             for (State state : beam) {
                 Candidate forced = fixedAt(fixed, step);
-                if (step == 0 && forced == null && first != null) {
-                    forced = first;
+                if (step == 0 && forced == null) {
+                    forced = first != null ? first : opener;
                 }
                 int before = next.size();
                 if (forced != null) {
                     // a locked song always keeps its place, even next to another chart of itself
-                    next.add(extend(state, forced, List.of(), cost(state, forced, step, referenceGenre, settings, levels),
+                    List<String> keys = forced == opener ? usableKeys.get(usable.indexOf(opener)) : List.of();
+                    next.add(extend(state, forced, keys, cost(state, forced, step, referenceGenre, settings, levels),
                             settings));
                     continue;
                 }
@@ -242,7 +263,47 @@ public final class MixSequencer {
         for (State state : beam) {
             finished.add(withLengthCost(state, settings));
         }
-        return finished.stream().min(Comparator.comparingDouble(State::cost)).map(State::songs).orElse(List.of());
+        return pickFinished(finished, random);
+    }
+
+    /** Cost margin inside which openers and finished sets count as equally good. */
+    private static final double OPENER_SLACK = 1.0;
+    private static final double FINISH_SLACK = 0.6;
+
+    /** A random opener among the ones that fit about as well as the best (Issue #563). */
+    private static Candidate pickOpener(List<Candidate> usable, double[] jitter, String referenceGenre, Settings settings,
+            double[] levels, Random random) {
+        if (usable.isEmpty()) {
+            return null;
+        }
+        State empty = new State(List.of(), Set.of(), 0, 0);
+        double[] costs = new double[usable.size()];
+        double best = Double.POSITIVE_INFINITY;
+        for (int c = 0; c < usable.size(); c++) {
+            costs[c] = cost(empty, usable.get(c), 0, referenceGenre, settings, levels) + jitter[c];
+            best = Math.min(best, costs[c]);
+        }
+        List<Candidate> good = new ArrayList<>();
+        for (int c = 0; c < usable.size(); c++) {
+            if (costs[c] <= best + OPENER_SLACK) {
+                good.add(usable.get(c));
+            }
+        }
+        return good.get(random.nextInt(good.size()));
+    }
+
+    /** A random one of the finished sets close to the best, so equal-looking sets take turns. */
+    private static List<Candidate> pickFinished(List<State> finished, Random random) {
+        if (finished.isEmpty()) {
+            return List.of();
+        }
+        finished.sort(Comparator.comparingDouble(State::cost));
+        double best = finished.get(0).cost();
+        int close = 0;
+        while (close < finished.size() && finished.get(close).cost() <= best + FINISH_SLACK) {
+            close++;
+        }
+        return finished.get(random.nextInt(Math.max(1, close))).songs();
     }
 
     private static boolean overlaps(Set<String> used, List<String> keys) {
@@ -295,8 +356,15 @@ public final class MixSequencer {
             }
             cost += genreCost(previous.genre(), candidate.genre()) * (settings.genreRule == GenreRule.ANY ? 0.3 : 1.2);
         }
-        if (!referenceGenre.isBlank() && settings.genreRule != GenreRule.ANY) {
+        if (settings.genreFamily != null && settings.genreRule != GenreRule.ANY) {
+            cost += settings.genreFamily.matches(candidate.genre()) ? 0 : 1.5;
+        } else if (!referenceGenre.isBlank() && settings.genreRule != GenreRule.ANY) {
             cost += genreCost(referenceGenre, candidate.genre()) * 1.5;
+        }
+        // songs of recently generated or saved sets give way to others
+        Double recent = settings.recentSongs.get(candidate.songKey());
+        if (recent != null) {
+            cost += recent;
         }
         // difficulty follows the requested curve over the expected length
         double progress = Math.min(1.0, state.totalMs() / (double) Math.max(1L, settings.targetMs));

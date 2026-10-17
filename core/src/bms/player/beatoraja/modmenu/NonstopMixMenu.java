@@ -10,6 +10,7 @@ import bms.player.beatoraja.nonstop.MixChartSwap;
 import bms.player.beatoraja.nonstop.MixCompiler;
 import bms.player.beatoraja.nonstop.MixDifficulty;
 import bms.player.beatoraja.nonstop.MixGenerator;
+import bms.player.beatoraja.nonstop.MixGenreFamily;
 import bms.player.beatoraja.nonstop.MixIrClient;
 import bms.player.beatoraja.nonstop.MixJoinPlanner;
 import bms.player.beatoraja.nonstop.MixJson;
@@ -121,6 +122,11 @@ public final class NonstopMixMenu {
     private static final ImInt GEN_STYLE = new ImInt(0);
     private static final ImInt GEN_GENRE_RULE = new ImInt(1);
     private static final ImString GEN_GENRE = new ImString(64);
+    /** 0: free text genre, n: {@code MixGenreFamily.values()[n - 1]}. */
+    private static final ImInt GEN_FAMILY = new ImInt(0);
+    /** Sets generated in this session, newest last (Issue #563: their songs are used less next time). */
+    private static final java.util.ArrayDeque<MixPlan> RECENT_GENERATED = new java.util.ArrayDeque<>();
+    private static final int RECENT_GENERATED_MAX = 5;
     private static final ImString GEN_FILTER = new ImString(64);
     /** 0: LV1–LV12 (normal), 1: ★1–★25 (insane); see {@link MixDifficulty}. */
     private static final ImInt GEN_SCALE = new ImInt(1);
@@ -1418,12 +1424,20 @@ public final class NonstopMixMenu {
                     new String[] {t("同じジャンルだけ", "Same genre only"), t("近いジャンルも", "Close genres too"),
                             t("ジャンル問わず", "Any genre")});
             ImGui.setNextItemWidth(240);
+            ImGui.combo(t("ジャンルの系統", "Genre family") + "##nm-genre-family", GEN_FAMILY, familyLabels());
+            if (ImGui.isItemHovered()) {
+                ImGui.setTooltip(t("系統を選ぶと、表記ゆれ（Drum'n'Bass / DnB / ドラムンベース など）をまとめて扱います",
+                        "A family covers the many spellings of a genre (Drum'n'Bass / DnB / ドラムンベース…)"));
+            }
+            ImGui.beginDisabled(GEN_FAMILY.get() > 0);
+            ImGui.setNextItemWidth(240);
             ImGui.inputText(t("ジャンル（空欄=基準曲から）", "Genre (empty = from the reference song)") + "##nm-genre", GEN_GENRE);
             ImGui.sameLine();
             if (selectedTrack >= 0 && selectedTrack < plan.tracks.size()
                     && ImGui.smallButton(t("選択中の曲のジャンル", "Selected song's genre") + "##nm-genre-pick")) {
                 GEN_GENRE.set(plan.tracks.get(selectedTrack).genre);
             }
+            ImGui.endDisabled();
             ImGui.setNextItemWidth(240);
             ImGui.inputText(t("曲名・アーティスト等で絞る", "Filter by title / artist") + "##nm-filter", GEN_FILTER);
             ImGui.setNextItemWidth(240);
@@ -1446,7 +1460,19 @@ public final class NonstopMixMenu {
                     new String[] {t("一定", "Flat"), t("だんだん上げる", "Rising"), t("だんだん下げる", "Falling"),
                             t("山を2回", "Two peaks"), t("最後に山場", "Peak at the end")});
             if (scope == 0) {
-                ImGui.checkbox(t("選択中の曲から始める（基準曲）", "Start from the selected song") + "##nm-reference", GEN_REFERENCE);
+                ImGui.checkbox(t("基準曲から始める（セットで選んだ曲、なければ選曲画面で選んでいる曲）",
+                        "Start from a reference song (the selected set song, else the song selected in Music Select)")
+                        + "##nm-reference", GEN_REFERENCE);
+                if (GEN_REFERENCE.get()) {
+                    Reference reference = reference();
+                    if (reference != null) {
+                        ImGui.textDisabled("    → " + reference.track().displayTitle());
+                    } else {
+                        ImGui.textColored(WARNING[0], WARNING[1], WARNING[2], WARNING[3], "    " + t(
+                                "基準曲がありません。セットの曲か、選曲画面で曲を選んでください",
+                                "No reference song: select a song in the set or in Music Select"));
+                    }
+                }
             }
             if (scope == 3) {
                 GEN_RANGE[0] = Math.max(1, Math.min(GEN_RANGE[0], Math.max(1, plan.tracks.size())));
@@ -1575,7 +1601,8 @@ public final class NonstopMixMenu {
         request.joins = joinSettings();
         request.sequence.targetMs = GEN_MINUTES[0] * 60_000L;
         request.sequence.genreRule = MixSequencer.GenreRule.values()[GEN_GENRE_RULE.get()];
-        request.sequence.genre = GEN_GENRE.get().trim();
+        request.sequence.genreFamily = GEN_FAMILY.get() > 0 ? MixGenreFamily.values()[GEN_FAMILY.get() - 1] : null;
+        request.sequence.genre = request.sequence.genreFamily != null ? "" : GEN_GENRE.get().trim();
         MixDifficulty.Scale scale = MixDifficulty.Scale.values()[GEN_SCALE.get()];
         int[] levels = GEN_LEVELS[GEN_SCALE.get()];
         request.sequence.minDifficulty = scale.lower(levels[0]);
@@ -1583,15 +1610,60 @@ public final class NonstopMixMenu {
         request.sequence.curve = MixSequencer.Curve.values()[GEN_CURVE.get()];
         request.sequence.tempoTolerance = Math.max(0.01, GEN_TOLERANCE[0] / 100.0);
         request.filter = GEN_FILTER.get().trim();
-        request.reference = GEN_REFERENCE.get() && selectedTrack >= 0 && selectedTrack < plan.tracks.size()
-                ? plan.tracks.get(selectedTrack) : null;
-        if (request.reference != null && request.sequence.genre.isEmpty()) {
+        request.reference = null;
+        if (GEN_REFERENCE.get() && request.scope == MixGenerator.Scope.EVERYTHING) {
+            Reference reference = reference();
+            if (reference == null) {
+                ImGuiNotify.warning(t("基準曲がありません。セットの曲か、選曲画面で曲を選んでください",
+                        "No reference song: select a song in the set or in Music Select"));
+                return;
+            }
+            Mode mode = Mode.getMode(modeHint(reference.mode()));
+            if (mode != null && mode != plan.mode) {
+                if (!plan.tracks.isEmpty()) {
+                    ImGuiNotify.warning(t("基準曲の鍵盤モードがセットと違います", "The reference song is of another key mode"));
+                    return;
+                }
+                // an empty set takes the reference song's key mode, as adding it would
+                plan.mode = mode;
+            }
+            request.reference = reference.track();
+        }
+        if (request.reference != null && request.sequence.genre.isEmpty() && request.sequence.genreFamily == null) {
             request.sequence.genre = request.reference.genre;
         }
+        request.recentSets = List.copyOf(RECENT_GENERATED);
+        request.savedSets = () -> store().listSets();
         request.rangeFrom = GEN_RANGE[0] - 1;
         request.rangeTo = GEN_RANGE[1] - 1;
         generated = null;
         generator = MixGenerator.start(plan, request, library);
+    }
+
+    private static String[] familyLabels() {
+        MixGenreFamily[] families = MixGenreFamily.values();
+        String[] labels = new String[families.length + 1];
+        labels[0] = t("（自由入力）", "(free text)");
+        for (int i = 0; i < families.length; i++) {
+            labels[i + 1] = families[i].label(!BMSIRArenaI18n.isEnglish());
+        }
+        return labels;
+    }
+
+    private record Reference(MixTrack track, int mode) {
+    }
+
+    /** The reference song: the selected set song, else the song selected in Music Select (Issue #563). */
+    private static Reference reference() {
+        if (selectedTrack >= 0 && selectedTrack < plan.tracks.size()) {
+            return new Reference(plan.tracks.get(selectedTrack), plan.mode.id);
+        }
+        if (main != null && main.getCurrentState() instanceof MusicSelector selector
+                && selector.getBarManager().getSelected() instanceof SongBar songBar && songBar.existsSong()) {
+            SongData song = songBar.getSongData();
+            return new Reference(MixLibrary.trackFrom(song), song.getMode());
+        }
+        return null;
     }
 
     // ------------------------------------------------------------------ saved
@@ -2041,6 +2113,10 @@ public final class NonstopMixMenu {
         if (gen != null && gen != consumedGenerator && gen.state() == MixGenerator.State.DONE && gen.result() != null) {
             generated = gen.result();
             consumedGenerator = gen;
+            RECENT_GENERATED.addLast(gen.result().copy());
+            while (RECENT_GENERATED.size() > RECENT_GENERATED_MAX) {
+                RECENT_GENERATED.removeFirst();
+            }
         }
         // a quiet background check after edits: compile with the cached charts and list the problems
         if (checkWanted && preparation == null && System.currentTimeMillis() - lastEdit > 700 && !plan.tracks.isEmpty()
