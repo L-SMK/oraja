@@ -21,6 +21,82 @@ class MixGeneratorPartsTest {
                 title, artist, "TECHNO", 140, true, 120_000L, 1500, 12, difficulty, folder + "/" + title + ".bms");
     }
 
+    static MixSequencer.Candidate genreChart(String title, String genre, double bpm, double difficulty) {
+        return new MixSequencer.Candidate(String.format("%064x", Math.abs(title.hashCode())), "", title,
+                "artist " + title, genre, bpm, true, 120_000L, 1500, 12, difficulty, "/songs/" + title + "/c.bms");
+    }
+
+    @Test
+    void differentSeedsGiveDifferentSetsWithABlankGenre() {
+        List<MixSequencer.Candidate> pool = new ArrayList<>();
+        String[] genres = {"TRANCE", "HOUSE", "TECHNO", "J-CORE", "ARTCORE"};
+        for (int i = 0; i < 60; i++) {
+            pool.add(genreChart("song " + i, genres[i % genres.length], 128 + (i * 7) % 50, 13 + i % 10));
+        }
+        java.util.Set<List<MixSequencer.Candidate>> sets = new java.util.HashSet<>();
+        java.util.Set<MixSequencer.Candidate> openers = new java.util.HashSet<>();
+        for (long seed = 1; seed <= 8; seed++) {
+            MixSequencer.Settings settings = new MixSequencer.Settings();
+            settings.targetMs = 12 * 60_000L;
+            settings.seed = seed;
+            List<MixSequencer.Candidate> set = MixSequencer.sequence(pool, List.of(), null, settings);
+            assertFalse(set.isEmpty());
+            // same seed, same set
+            assertEquals(set, MixSequencer.sequence(pool, List.of(), null, settings));
+            sets.add(set);
+            openers.add(set.get(0));
+        }
+        assertTrue(sets.size() >= 6, "distinct sets: " + sets.size());
+        assertTrue(openers.size() >= 4, "distinct openers: " + openers.size());
+    }
+
+    @Test
+    void songsOfRecentSetsGiveWay() {
+        List<MixSequencer.Candidate> pool = new ArrayList<>();
+        for (int i = 0; i < 30; i++) {
+            pool.add(genreChart("song " + i, "HOUSE", 126, 20));
+        }
+        MixSequencer.Settings settings = new MixSequencer.Settings();
+        settings.targetMs = 8 * 60_000L;
+        settings.seed = 5;
+        List<MixSequencer.Candidate> first = MixSequencer.sequence(pool, List.of(), null, settings);
+        MixPlan previous = new MixPlan();
+        for (MixSequencer.Candidate song : first) {
+            MixTrack track = new MixTrack();
+            track.title = song.title();
+            track.artist = song.artist();
+            previous.tracks.add(track);
+        }
+        settings.recentSongs = MixGenerator.recentSongs(List.of(previous), List.of());
+        List<MixSequencer.Candidate> second = MixSequencer.sequence(pool, List.of(), null, settings);
+        long repeated = second.stream().filter(first::contains).count();
+        assertTrue(repeated <= 1, "repeated " + repeated + " of " + second.size());
+        // a locked song stays even when it was in the recent set
+        MixSequencer.Fixed locked = new MixSequencer.Fixed(0, first.get(0));
+        assertEquals(first.get(0), MixSequencer.sequence(pool, List.of(locked), null, settings).get(0));
+    }
+
+    @Test
+    void genreFamilyFiltersAndSteersTheSet() {
+        List<MixSequencer.Candidate> pool = new ArrayList<>();
+        String[] dnb = {"Drum'n'Bass", "DnB", "ドラムンベース", "Liquid Funk", "Jungle", "DRUM & BASS"};
+        for (int i = 0; i < 18; i++) {
+            pool.add(genreChart("dnb " + i, dnb[i % dnb.length], 172, 20));
+            pool.add(genreChart("trance " + i, "TRANCE", 172, 20));
+        }
+        MixSequencer.Settings settings = new MixSequencer.Settings();
+        settings.genreRule = MixSequencer.GenreRule.STRICT;
+        settings.genreFamily = MixGenreFamily.DRUM_N_BASS;
+        settings.targetMs = 10 * 60_000L;
+        settings.seed = 9;
+        List<MixSequencer.Candidate> set = MixSequencer.sequence(pool, List.of(), null, settings);
+        assertTrue(set.size() >= 4);
+        assertTrue(set.stream().allMatch(c -> c.title().startsWith("dnb")), set.toString());
+        settings.genreRule = MixSequencer.GenreRule.SIMILAR;
+        set = MixSequencer.sequence(pool, List.of(), null, settings);
+        assertTrue(set.stream().filter(c -> c.title().startsWith("dnb")).count() * 2 > set.size(), set.toString());
+    }
+
     @Test
     void sequencerUsesOneChartPerSong() {
         List<MixSequencer.Candidate> pool = new ArrayList<>();
