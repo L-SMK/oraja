@@ -48,6 +48,7 @@ public class MiscSettingMenu {
     private static final ImInt LANE_COVER_SWITCH_DURATION = new ImInt(0);
     private static final ImBoolean ENABLE_CONSTANT = new ImBoolean(false);
     private static final ImInt CONSTANT_VALUE = new ImInt(0);
+    private static final ImBoolean END_PLAY_AT_LAST_NOTE = new ImBoolean(false);
     private static ImInt SELECTED_PLAYER;
 
     private static String[] players = PlayerConfig.readAllPlayerID("player");
@@ -113,6 +114,15 @@ public class MiscSettingMenu {
             }
 
             PlayerConfig player = main.getPlayerConfig();
+            END_PLAY_AT_LAST_NOTE.set(player.isEndPlayAtLastNote());
+            if (ImGui.checkbox(t("最終ノーツ後すぐに終了", "End play at last note"), END_PLAY_AT_LAST_NOTE)) {
+                player.setEndPlayAtLastNote(END_PLAY_AT_LAST_NOTE.get());
+            }
+            if (ImGui.isItemHovered()) {
+                ImGui.setTooltip(t("最後のノーツ（LN終端を含む）の判定が確定したら、余韻を待たずにリザルトへ進みます。",
+                        "Goes to the result as soon as the last note (including LN ends) is judged, without the trailing wait."));
+            }
+
             if (ImGui.collapsingHeader(t("キープロファイル", "Key Profiles") + "###play-settings-key-profiles")) {
                 BMSIRArenaOverlay.renderKeyProfiles(player);
                 alsoInArena(t("Arenaオーバーレイの「プロファイル」タブ", "the Arena overlay's Profiles tab"));
