@@ -424,6 +424,8 @@ public class PlayConfigurationView implements Initializable {
 	@FXML
 	private CheckBox chartpreview;
 	@FXML
+	private CheckBox endplayatlastnote;
+	@FXML
 	private CheckBox guidese;
 	@FXML
 	private CheckBox windowhold;
@@ -1233,6 +1235,7 @@ public class PlayConfigurationView implements Initializable {
 		registerControlHelp("songPreview", "楽曲プレビュー", "選曲中の試聴をOFF、1回、ループから選びます。", "Song preview", "Choose off, one-shot, or looping audio preview in Music Select.", HelpGraphic.MUSIC);
 		registerControlHelp("hispeed", "HI-SPEED", "ノーツのスクロール速度倍率です。", "HI-SPEED", "Set the note scroll-speed multiplier.", HelpGraphic.PLAY);
 		registerControlHelp("gvalue", "ノーツ表示時間", "ノーツが判定位置へ届くまでの表示時間、いわゆる緑数字です。単位はmsです。", "Note display time", "Set the time until notes reach the judgment line, commonly called green number, in ms.", HelpGraphic.PLAY);
+		registerControlHelp("endplayatlastnote", "最終ノーツ後すぐに終了", "最後のノーツ（LN終端を含む）の判定が確定したら、余韻を待たずにリザルトへ進みます。スコアと判定は変わりません。", "End play at last note", "Goes to the result as soon as the last note (including LN ends) is judged, without the trailing wait. Score and judgments are unchanged.", HelpGraphic.PLAY);
 		registerControlHelp("chartpreview", "チャートプレビュー", "楽曲ロード中にSTARTまたはSELECTを押している間、プレイ画面上で譜面の流れを先行表示します。選曲時の試聴機能ではありません。", "Chart Preview", "While loading, hold START or SELECT to preview chart movement on the play field. This is not the Music Select audio preview.", HelpGraphic.PLAY);
 		registerControlHelp("configurationLayout", "設定画面", "クラシックは従来の上タブ、サイドバーは左側のカテゴリと図付き説明を使用します。設定項目と保存内容は共通です。", "Configuration screen", "Classic uses the existing top tabs; Sidebar uses left categories and illustrated help. Both edit the same settings.", HelpGraphic.OTHER);
 		registerControlHelp("irpassword", "Password", "IRへログインするためのパスワードです。画面上では伏せて表示されます。", "Password", "The IR login password; it remains masked on screen.", HelpGraphic.IR);
@@ -2171,7 +2174,11 @@ public class PlayConfigurationView implements Initializable {
 				sidebarSettingRow("チャートプレビュー", "Chart Preview",
 						"楽曲ロード中にSTARTまたはSELECTを押している間、プレイ画面で譜面の流れを先行表示します。選曲時の試聴ではありません。",
 						"While loading, hold START or SELECT to preview chart movement on the play field. This is not Music Select audio preview.",
-						sidebarToggle(chartpreview))
+						sidebarToggle(chartpreview)),
+				sidebarSettingRow("最終ノーツ後すぐに終了", "End play at last note",
+						"最後のノーツ（LN終端を含む）の判定が確定したら、余韻を待たずにリザルトへ進みます。スコアと判定は変わりません。",
+						"Goes to the result as soon as the last note (including LN ends) is judged, without the trailing wait. Score and judgments are unchanged.",
+						sidebarToggle(endplayatlastnote))
 		);
 
 		sidebarPlayOptionGroups.getChildren().setAll(visibility, chart, assist, result);
@@ -3179,6 +3186,7 @@ public class PlayConfigurationView implements Initializable {
 		seventoninetype.getSelectionModel().select(player.getSevenToNineType());
 		exitpressduration.getValueFactory().setValue(player.getExitPressDuration());
 		chartpreview.setSelected(player.isChartPreview());
+		endplayatlastnote.setSelected(player.isEndPlayAtLastNote());
 		guidese.setSelected(player.isGuideSE());
 		windowhold.setSelected(player.isWindowHold());
 		gaugeop.getSelectionModel().select(player.getGauge());
@@ -3405,6 +3413,7 @@ public class PlayConfigurationView implements Initializable {
 		player.setSevenToNineType(seventoninetype.getValue());
 		player.setExitPressDuration(getValue(exitpressduration));
 		player.setChartPreview(chartpreview.isSelected());
+		player.setEndPlayAtLastNote(endplayatlastnote.isSelected());
 		player.setGuideSE(guidese.isSelected());
 		player.setWindowHold(windowhold.isSelected());
 		player.setGauge(gaugeop.getValue());
