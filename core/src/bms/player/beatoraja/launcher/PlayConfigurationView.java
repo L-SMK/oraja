@@ -800,9 +800,9 @@ public class PlayConfigurationView implements Initializable {
 		hispeedLr2Group = new VBox(12, speedRow(uiText("基本スクロール", "Base scroll"), moveSpeedControl(bmsirBaseScrollSpeed)),
 				speedRow(uiText("基準BPM", "Reference BPM"), moveSpeedControl(bmsirHispeedReferenceBpm)));
 		hispeedFloatingGroup = new VBox(12,
-				speedRow(uiText("保存緑数字", "Saved green number"), moveSpeedControl(bmsirFloatingGreen)),
-				speedRow(uiText("倍率", "Multiplier"), moveSpeedControl(bmsirFloatingHispeed)),
-				new Label(uiText("START＋鍵盤で±0.50。カバー操作で保存緑数字へ戻ります。", "START + keys: ±0.50. Cover adjustment restores the saved green number.")));
+				speedRow(uiText("緑数字", "Green number"), moveSpeedControl(bmsirFloatingGreen)),
+				new Label(uiText("倍率は曲開始時に緑数字とBPMから決まります。START＋鍵盤は倍率±0.50相当で緑数字を変えます。",
+						"The multiplier follows the green number and BPM at song start. START + keys change the green number by a ±0.50 multiplier step.")));
 		hispeedCoverSteps = new VBox(12,
 				speedRow(uiText("カバー変更幅（低速）", "Cover step (slow)"), moveSpeedControl(lanecovermarginlow)),
 				speedRow(uiText("カバー変更幅（高速）", "Cover step (fast)"), moveSpeedControl(lanecovermarginhigh)),
@@ -3560,7 +3560,6 @@ public class PlayConfigurationView implements Initializable {
 			int duration = normalDurationForGreen(conf.getDuration(), getValue(hispeedGreenNumber));
 			conf.setDuration(duration); gvalue.getValueFactory().setValue(duration);
 		}
-		conf.setBmsirFloatingHispeed(getValue(bmsirFloatingHispeed).floatValue());
 		int green = getValue(bmsirFloatingGreen);
 		if (green != bms.player.beatoraja.play.BMSIRFloatingHispeed.greenNumber(conf.getBmsirFloatingGreenFrames())) {
 			conf.setBmsirFloatingGreenFrames(green / 10f);
