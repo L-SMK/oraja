@@ -7,6 +7,7 @@ import bms.player.beatoraja.arena.bmsir.BMSIRArenaI18n;
 import bms.player.beatoraja.arena.bmsir.BMSIRNonstopMixTransport;
 import bms.player.beatoraja.nonstop.CompiledMix;
 import bms.player.beatoraja.nonstop.MixCompiler;
+import bms.player.beatoraja.nonstop.MixDifficulty;
 import bms.player.beatoraja.nonstop.MixGenerator;
 import bms.player.beatoraja.nonstop.MixIrClient;
 import bms.player.beatoraja.nonstop.MixJoinPlanner;
@@ -113,7 +114,9 @@ public final class NonstopMixMenu {
     private static final ImInt GEN_GENRE_RULE = new ImInt(1);
     private static final ImString GEN_GENRE = new ImString(64);
     private static final ImString GEN_FILTER = new ImString(64);
-    private static final int[] GEN_LEVELS = {0, 99};
+    /** 0: LV1–LV12 (normal), 1: ★1–★25 (insane); see {@link MixDifficulty}. */
+    private static final ImInt GEN_SCALE = new ImInt(1);
+    private static final int[][] GEN_LEVELS = {{1, MixDifficulty.NORMAL_MAX}, {1, MixDifficulty.INSANE_MAX}};
     private static final ImInt GEN_CURVE = new ImInt(1);
     private static final ImInt GEN_BARS = new ImInt(2);
     private static final float[] GEN_TOLERANCE = {3.0f};
@@ -1297,7 +1300,20 @@ public final class NonstopMixMenu {
             ImGui.setNextItemWidth(240);
             ImGui.inputText(t("曲名・アーティスト等で絞る", "Filter by title / artist") + "##nm-filter", GEN_FILTER);
             ImGui.setNextItemWidth(240);
-            ImGui.sliderInt2(t("レベルの範囲", "Level range") + "##nm-levels", GEN_LEVELS, 0, 30);
+            ImGui.combo(t("難易度の目盛り", "Difficulty scale") + "##nm-scale", GEN_SCALE,
+                    new String[] {t("通常 LV1–LV12", "Normal LV1–LV12"), t("発狂 ★1–★25", "Insane ★1–★25")});
+            MixDifficulty.Scale scale = MixDifficulty.Scale.values()[GEN_SCALE.get()];
+            int[] levels = GEN_LEVELS[GEN_SCALE.get()];
+            ImGui.setNextItemWidth(240);
+            if (ImGui.sliderInt2(t("レベルの範囲", "Level range") + "##nm-levels", levels, scale.min, scale.max,
+                    scale.prefix + "%d")) {
+                levels[0] = Math.max(scale.min, Math.min(levels[0], scale.max));
+                levels[1] = Math.max(levels[0], Math.min(levels[1], scale.max));
+            }
+            if (ImGui.isItemHovered()) {
+                ImGui.setTooltip(t("難易度表（☆/★）の位置で選びます。表にない譜面はノーツ密度から推定します",
+                        "Uses the chart's place in your ☆/★ difficulty tables; charts on no table are estimated from note density"));
+            }
             ImGui.setNextItemWidth(240);
             ImGui.combo(t("難しさの流れ", "Difficulty flow") + "##nm-curve-gen", GEN_CURVE,
                     new String[] {t("一定", "Flat"), t("だんだん上げる", "Rising"), t("だんだん下げる", "Falling"),
@@ -1363,8 +1379,9 @@ public final class NonstopMixMenu {
             ImGui.beginChild("##nm-generated", 0, Math.max(120, ImGui.getContentRegionAvailY() - 40), true);
             for (int i = 0; i < generated.tracks.size(); i++) {
                 MixTrack track = generated.tracks.get(i);
-                ImGui.text(String.format(Locale.ROOT, "%2d. %s  [%s] BPM%.0f Lv%d", i + 1, track.displayTitle(), track.genre,
-                        track.bpm, track.level));
+                double axis = generator != null ? generator.difficulty(track) : Double.NaN;
+                ImGui.text(String.format(Locale.ROOT, "%2d. %s  [%s] BPM%.0f %s", i + 1, track.displayTitle(), track.genre,
+                        track.bpm, Double.isNaN(axis) ? "Lv" + track.level : MixDifficulty.label(axis)));
                 if (i < generated.transitions.size()) {
                     ImGui.textDisabled("      ↳ " + joinText(generated.transitions.get(i)));
                 }
@@ -1416,8 +1433,10 @@ public final class NonstopMixMenu {
         request.sequence.targetMs = GEN_MINUTES[0] * 60_000L;
         request.sequence.genreRule = MixSequencer.GenreRule.values()[GEN_GENRE_RULE.get()];
         request.sequence.genre = GEN_GENRE.get().trim();
-        request.sequence.minLevel = GEN_LEVELS[0];
-        request.sequence.maxLevel = GEN_LEVELS[1] >= 30 ? 99 : GEN_LEVELS[1];
+        MixDifficulty.Scale scale = MixDifficulty.Scale.values()[GEN_SCALE.get()];
+        int[] levels = GEN_LEVELS[GEN_SCALE.get()];
+        request.sequence.minDifficulty = scale.lower(levels[0]);
+        request.sequence.maxDifficulty = scale.upper(levels[1]);
         request.sequence.curve = MixSequencer.Curve.values()[GEN_CURVE.get()];
         request.sequence.tempoTolerance = Math.max(0.01, GEN_TOLERANCE[0] / 100.0);
         request.filter = GEN_FILTER.get().trim();

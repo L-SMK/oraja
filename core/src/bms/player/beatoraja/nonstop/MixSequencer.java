@@ -16,17 +16,55 @@ import java.util.Set;
  */
 public final class MixSequencer {
 
-    /** A library song that may be used. */
+    /**
+     * A library song that may be used. {@code difficulty} is the place on the
+     * {@link MixDifficulty} axis (table first, then density).
+     */
     public record Candidate(String sha256, String md5, String title, String artist, String genre, double bpm,
-            boolean steadyTempo, long lengthMs, int notes, int level, String path) {
+            boolean steadyTempo, long lengthMs, int notes, int level, double difficulty, String path) {
 
-        /** Title without difficulty decorations, used to avoid the same song twice. */
+        /** Title and artist without chart decorations, used to avoid the same song twice. */
         public String songKey() {
-            String key = title == null ? "" : title.toLowerCase(Locale.ROOT);
-            key = key.replaceAll("[\\[\\(（【<＜].*?[\\]\\)）】>＞]", "");
-            key = key.replaceAll("\\s+-[^-]+-\\s*$", "");
-            return key.replaceAll("\\s+", " ").trim() + "|" + (artist == null ? "" : artist.toLowerCase(Locale.ROOT));
+            return normalizeTitle(title) + "|" + normalizeArtist(artist);
         }
+
+        /** Folder of the chart file; charts of one song share it. Empty when unknown. */
+        public String folderKey() {
+            if (path == null || path.isBlank()) {
+                return "";
+            }
+            String normalized = path.replace('\\', '/');
+            int slash = normalized.lastIndexOf('/');
+            return slash <= 0 ? "" : normalized.substring(0, slash).toLowerCase(Locale.ROOT);
+        }
+
+        /** Keys that mark the same song: the title key, and the folder when known. */
+        List<String> sameSongKeys() {
+            String folder = folderKey();
+            return folder.isEmpty() ? List.of("t:" + songKey()) : List.of("t:" + songKey(), "f:" + folder);
+        }
+    }
+
+    static String normalizeTitle(String title) {
+        String raw = title == null ? "" : java.text.Normalizer.normalize(title, java.text.Normalizer.Form.NFKC)
+                .toLowerCase(Locale.ROOT);
+        String key = raw;
+        // [ANOTHER], (7keys), 【SP】, <HARD>, -INSANE-, ~LN~ and the like name the chart, not the song
+        key = key.replaceAll("[\\[\\(【<「『].*?[\\]\\)】>」』]", " ");
+        key = key.replaceAll("\\s+-[^-]+-\\s*$", " ");
+        key = key.replaceAll("\\s+[~〜][^~〜]+[~〜]\\s*$", " ");
+        key = key.replaceAll("[\\s\\p{Punct}・]+", " ").trim();
+        // a title that is only decoration keeps it
+        return key.isEmpty() ? raw.replaceAll("\\s+", " ").trim() : key;
+    }
+
+    static String normalizeArtist(String artist) {
+        String key = artist == null ? "" : java.text.Normalizer.normalize(artist, java.text.Normalizer.Form.NFKC)
+                .toLowerCase(Locale.ROOT);
+        // "composer / obj:charter" differs between charts of one song
+        key = key.replaceAll("\\s*(/|obj\\s*[.:]|譜面).*$", "");
+        key = key.replaceAll("[\\[\\(【<].*?[\\]\\)】>]", " ");
+        return key.replaceAll("[\\s\\p{Punct}]+", " ").trim();
     }
 
     public enum GenreRule {
@@ -59,8 +97,11 @@ public final class MixSequencer {
         public GenreRule genreRule = GenreRule.SIMILAR;
         /** Genre the set follows; empty takes the first song's genre. */
         public String genre = "";
-        public int minLevel = 0;
-        public int maxLevel = 99;
+        /** Range on the {@link MixDifficulty} axis. */
+        public double minDifficulty = Double.NEGATIVE_INFINITY;
+        public double maxDifficulty = Double.POSITIVE_INFINITY;
+        /** At most one chart per song (same folder, or same title and artist). */
+        public boolean oneChartPerSong = true;
         public Curve curve = Curve.RISING;
         /** Allowed tempo difference between neighbours before it costs (ratio). */
         public double tempoTolerance = 0.04;
@@ -79,8 +120,9 @@ public final class MixSequencer {
             copy.targetMs = targetMs;
             copy.genreRule = genreRule;
             copy.genre = genre;
-            copy.minLevel = minLevel;
-            copy.maxLevel = maxLevel;
+            copy.minDifficulty = minDifficulty;
+            copy.maxDifficulty = maxDifficulty;
+            copy.oneChartPerSong = oneChartPerSong;
             copy.curve = curve;
             copy.tempoTolerance = tempoTolerance;
             copy.halfDouble = halfDouble;
@@ -114,9 +156,20 @@ public final class MixSequencer {
         String referenceGenre = settings.genre == null || settings.genre.isBlank()
                 ? (first != null ? first.genre() : fixed.isEmpty() ? "" : fixed.get(0).candidate().genre())
                 : settings.genre;
+        // songs the set already has to contain: no other chart of them may be picked
+        Set<String> reserved = new HashSet<>();
+        if (settings.oneChartPerSong) {
+            for (Fixed item : fixed) {
+                reserved.addAll(item.candidate().sameSongKeys());
+            }
+            if (first != null) {
+                reserved.addAll(first.sameSongKeys());
+            }
+        }
         List<Candidate> usable = new ArrayList<>();
+        List<List<String>> usableKeys = new ArrayList<>();
         for (Candidate candidate : pool) {
-            if (candidate.level() < settings.minLevel || candidate.level() > settings.maxLevel) {
+            if (candidate.difficulty() < settings.minDifficulty || candidate.difficulty() > settings.maxDifficulty) {
                 continue;
             }
             if (candidate.lengthMs() > 0 && candidate.lengthMs() < 30_000L) {
@@ -126,9 +179,16 @@ public final class MixSequencer {
                     && !normalizeGenre(candidate.genre()).equals(normalizeGenre(referenceGenre))) {
                 continue;
             }
+            List<String> keys = settings.oneChartPerSong ? candidate.sameSongKeys() : List.of("#" + usable.size());
+            if (overlaps(reserved, keys)) {
+                continue;
+            }
             usable.add(candidate);
+            usableKeys.add(keys);
         }
-        int[] levels = {Math.max(settings.minLevel, minLevel(usable)), Math.min(settings.maxLevel, maxLevel(usable))};
+        double[] levels = {
+                Math.max(settings.minDifficulty, minDifficulty(usable)),
+                Math.min(settings.maxDifficulty, maxDifficulty(usable))};
         double[] jitter = new double[usable.size()];
         for (int i = 0; i < jitter.length; i++) {
             jitter[i] = random.nextDouble() * 0.35;
@@ -145,19 +205,24 @@ public final class MixSequencer {
                 if (step == 0 && forced == null && first != null) {
                     forced = first;
                 }
+                int before = next.size();
                 if (forced != null) {
-                    if (!state.used().contains(forced.songKey())) {
-                        next.add(extend(state, forced, cost(state, forced, step, referenceGenre, settings, levels), settings));
-                    }
+                    // a locked song always keeps its place, even next to another chart of itself
+                    next.add(extend(state, forced, List.of(), cost(state, forced, step, referenceGenre, settings, levels),
+                            settings));
                     continue;
                 }
                 for (int c = 0; c < usable.size(); c++) {
                     Candidate candidate = usable.get(c);
-                    if (state.used().contains(candidate.songKey()) || isFixedElsewhere(fixed, candidate)) {
+                    if (overlaps(state.used(), usableKeys.get(c))) {
                         continue;
                     }
                     double cost = cost(state, candidate, step, referenceGenre, settings, levels) + jitter[c];
-                    next.add(extend(state, candidate, cost, settings));
+                    next.add(extend(state, candidate, usableKeys.get(c), cost, settings));
+                }
+                if (next.size() == before && remainingFixed(fixed, state.songs().size()) == 0) {
+                    // nothing left to add: the set ends here, shorter than the target
+                    finished.add(withLengthCost(state, settings));
                 }
             }
             next.sort(Comparator.comparingDouble(State::cost));
@@ -180,16 +245,28 @@ public final class MixSequencer {
         return finished.stream().min(Comparator.comparingDouble(State::cost)).map(State::songs).orElse(List.of());
     }
 
+    private static boolean overlaps(Set<String> used, List<String> keys) {
+        for (String key : keys) {
+            if (used.contains(key)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static State withLengthCost(State state, Settings settings) {
         double miss = Math.abs(state.totalMs() - settings.targetMs) / (double) Math.max(60_000L, settings.targetMs);
         return new State(state.songs(), state.used(), state.totalMs(), state.cost() + miss * 6.0);
     }
 
-    private static State extend(State state, Candidate candidate, double cost, Settings settings) {
+    private static State extend(State state, Candidate candidate, List<String> keys, double cost, Settings settings) {
         List<Candidate> songs = new ArrayList<>(state.songs());
         songs.add(candidate);
-        Set<String> used = new HashSet<>(state.used());
-        used.add(candidate.songKey());
+        Set<String> used = state.used();
+        if (!keys.isEmpty()) {
+            used = new HashSet<>(used);
+            used.addAll(keys);
+        }
         long length = candidate.lengthMs() > 0 ? candidate.lengthMs() : 120_000L;
         if (settings.segmentMs > 0) {
             length = Math.min(length, settings.segmentMs);
@@ -199,7 +276,7 @@ public final class MixSequencer {
     }
 
     static double cost(State state, Candidate candidate, int step, String referenceGenre, Settings settings,
-            int[] levels) {
+            double[] levels) {
         double cost = 0;
         Candidate previous = state.songs().isEmpty() ? null : state.songs().get(state.songs().size() - 1);
         if (previous != null) {
@@ -223,11 +300,11 @@ public final class MixSequencer {
         }
         // difficulty follows the requested curve over the expected length
         double progress = Math.min(1.0, state.totalMs() / (double) Math.max(1L, settings.targetMs));
-        int low = levels[0];
-        int high = levels[1];
+        double low = levels[0];
+        double high = levels[1];
         if (high > low) {
             double target = low + (high - low) * settings.curve.at(progress);
-            cost += Math.abs(candidate.level() - target) / Math.max(1.0, (high - low) / 3.0);
+            cost += Math.abs(candidate.difficulty() - target) / Math.max(1.0, (high - low) / 3.0);
         }
         return cost;
     }
@@ -291,15 +368,6 @@ public final class MixSequencer {
         return null;
     }
 
-    private static boolean isFixedElsewhere(List<Fixed> fixed, Candidate candidate) {
-        for (Fixed item : fixed) {
-            if (item.candidate().songKey().equals(candidate.songKey())) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     private static int remainingFixed(List<Fixed> fixed, int placed) {
         int remaining = 0;
         for (Fixed item : fixed) {
@@ -310,19 +378,19 @@ public final class MixSequencer {
         return remaining;
     }
 
-    private static int minLevel(List<Candidate> pool) {
-        int level = Integer.MAX_VALUE;
+    private static double minDifficulty(List<Candidate> pool) {
+        double level = Double.POSITIVE_INFINITY;
         for (Candidate candidate : pool) {
-            level = Math.min(level, candidate.level());
+            level = Math.min(level, candidate.difficulty());
         }
-        return level == Integer.MAX_VALUE ? 0 : level;
+        return level == Double.POSITIVE_INFINITY ? 0 : level;
     }
 
-    private static int maxLevel(List<Candidate> pool) {
-        int level = 0;
+    private static double maxDifficulty(List<Candidate> pool) {
+        double level = Double.NEGATIVE_INFINITY;
         for (Candidate candidate : pool) {
-            level = Math.max(level, candidate.level());
+            level = Math.max(level, candidate.difficulty());
         }
-        return level;
+        return level == Double.NEGATIVE_INFINITY ? 0 : level;
     }
 }

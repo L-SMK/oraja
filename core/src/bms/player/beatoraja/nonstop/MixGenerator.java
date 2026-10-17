@@ -50,6 +50,8 @@ public final class MixGenerator {
     private volatile String error = "";
     private volatile MixPlan result;
     private final List<String> notes = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private final java.util.Map<MixTrack, Double> difficulties =
+            java.util.Collections.synchronizedMap(new java.util.IdentityHashMap<>());
 
     private MixGenerator() {
     }
@@ -82,6 +84,12 @@ public final class MixGenerator {
     /** Messages for the player about what could not be satisfied. */
     public List<String> notes() {
         return notes;
+    }
+
+    /** Place on the {@link MixDifficulty} axis of each chosen track (for the result list). */
+    public double difficulty(MixTrack track) {
+        Double axis = difficulties.get(track);
+        return axis == null ? Double.NaN : axis;
     }
 
     public void cancel() {
@@ -225,12 +233,13 @@ public final class MixGenerator {
         settings.segmentMs = request.joins.style.segmentMs;
         settings.joinMs = request.joins.allowBlend ? 6000L : 0L;
         java.util.Map<MixSequencer.Candidate, MixTrack> existing = new java.util.IdentityHashMap<>();
+        Difficulties levels = Difficulties.load(library);
 
         switch (request.scope) {
             case ORDER_AND_JOINS -> {
                 for (int i = 0; i < plan.tracks.size(); i++) {
                     MixTrack track = plan.tracks.get(i);
-                    MixSequencer.Candidate candidate = candidate(track, library);
+                    MixSequencer.Candidate candidate = candidate(track, library, levels);
                     existing.put(candidate, track);
                     if (track.lockSong) {
                         fixed.add(new MixSequencer.Fixed(i, candidate));
@@ -240,20 +249,22 @@ public final class MixGenerator {
                 }
                 settings.targetMs = Long.MAX_VALUE / 4;
                 settings.maxTracks = plan.tracks.size();
-                settings.minLevel = 0;
-                settings.maxLevel = Integer.MAX_VALUE;
+                settings.minDifficulty = Double.NEGATIVE_INFINITY;
+                settings.maxDifficulty = Double.POSITIVE_INFINITY;
+                // only reorders what is there, duplicates included
+                settings.oneChartPerSong = false;
                 settings.genreRule = MixSequencer.GenreRule.ANY;
             }
             case RANGE -> {
                 for (int i = 0; i < plan.tracks.size(); i++) {
                     if (i < request.rangeFrom || i > request.rangeTo || plan.tracks.get(i).lockSong) {
                         MixTrack track = plan.tracks.get(i);
-                        MixSequencer.Candidate candidate = candidate(track, library);
+                        MixSequencer.Candidate candidate = candidate(track, library, levels);
                         existing.put(candidate, track);
                         fixed.add(new MixSequencer.Fixed(i, candidate));
                     }
                 }
-                pool.addAll(libraryPool(plan, request, library));
+                pool.addAll(libraryPool(plan, request, library, levels));
                 settings.targetMs = Long.MAX_VALUE / 4;
                 settings.maxTracks = plan.tracks.size();
             }
@@ -261,17 +272,17 @@ public final class MixGenerator {
                 for (int i = 0; i < plan.tracks.size(); i++) {
                     if (plan.tracks.get(i).lockSong) {
                         MixTrack track = plan.tracks.get(i);
-                        MixSequencer.Candidate candidate = candidate(track, library);
+                        MixSequencer.Candidate candidate = candidate(track, library, levels);
                         existing.put(candidate, track);
                         fixed.add(new MixSequencer.Fixed(i, candidate));
                     }
                 }
-                pool.addAll(libraryPool(plan, request, library));
+                pool.addAll(libraryPool(plan, request, library, levels));
             }
         }
         MixSequencer.Candidate reference = null;
         if (request.reference != null && request.scope == Scope.EVERYTHING) {
-            reference = candidate(request.reference, library);
+            reference = candidate(request.reference, library, levels);
             existing.put(reference, request.reference.copy());
         }
         if (request.scope == Scope.EVERYTHING && pool.size() < 3) {
@@ -292,32 +303,40 @@ public final class MixGenerator {
                 track.level = candidate.level();
                 track.localPath = candidate.path();
             }
+            difficulties.put(track, candidate.difficulty());
             tracks.add(track);
         }
         return tracks;
     }
 
-    private static MixSequencer.Candidate candidate(MixTrack track, MixLibrary library) {
+    private static MixSequencer.Candidate candidate(MixTrack track, MixLibrary library, Difficulties levels) {
         SongData song = library.find(track);
         if (song != null) {
-            return candidate(song);
+            levels.fillInformation(List.of(song));
+            return candidate(song, levels.of(song));
+        }
+        double axis = MixDifficulty.lookup(levels.tables, track.sha256, track.md5);
+        if (Double.isNaN(axis)) {
+            axis = MixDifficulty.estimate(0, 0, 0, track.level);
         }
         return new MixSequencer.Candidate(track.sha256, track.md5, track.title, track.artist, track.genre, track.bpm,
-                true, 0, 0, track.level, track.localPath);
+                true, 0, 0, track.level, axis, track.localPath);
     }
 
-    static MixSequencer.Candidate candidate(SongData song) {
+    static MixSequencer.Candidate candidate(SongData song, double difficulty) {
         return new MixSequencer.Candidate(song.getSha256(), song.getMd5(), song.getTitle(), song.getArtist(),
                 song.getGenre(), song.getMaxbpm(), song.getMinbpm() == song.getMaxbpm(), song.getLength(),
-                song.getNotes(), song.getLevel(), song.getPath());
+                song.getNotes(), song.getLevel(), difficulty, song.getPath());
     }
 
-    private static List<MixSequencer.Candidate> libraryPool(MixPlan plan, Request request, MixLibrary library) {
+    private static List<MixSequencer.Candidate> libraryPool(MixPlan plan, Request request, MixLibrary library,
+            Difficulties levels) {
         List<MixSequencer.Candidate> pool = new ArrayList<>();
         if (library.main() == null || library.main().getSongDatabase() == null) {
             return pool;
         }
         String filter = request.filter == null ? "" : request.filter.trim().toLowerCase(Locale.ROOT);
+        List<SongData> songs = new ArrayList<>();
         for (SongData song : library.main().getSongDatabase().getSongDatasByMode(plan.mode.id, POOL_LIMIT)) {
             if (song.getPath() == null || song.getNotes() <= 0) {
                 continue;
@@ -329,9 +348,95 @@ public final class MixGenerator {
                     continue;
                 }
             }
-            pool.add(candidate(song));
+            songs.add(song);
+        }
+        levels.fillInformation(songs);
+        for (SongData song : songs) {
+            pool.add(candidate(song, levels.of(song)));
         }
         return pool;
+    }
+
+    /** Difficulty places from the player's tables, with density estimates for the rest. */
+    private static final class Difficulties {
+        private static final java.util.regex.Pattern HASH = java.util.regex.Pattern.compile("[0-9a-fA-F]{64}");
+        private static final int INFO_CHUNK = 500;
+
+        final java.util.Map<String, Double> tables;
+        private final bms.player.beatoraja.song.SongInformationAccessor info;
+
+        private Difficulties(java.util.Map<String, Double> tables, bms.player.beatoraja.song.SongInformationAccessor info) {
+            this.tables = tables;
+            this.info = info;
+        }
+
+        static Difficulties load(MixLibrary library) {
+            if (library.main() == null || library.main().getConfig() == null) {
+                return new Difficulties(java.util.Map.of(), null);
+            }
+            bms.player.beatoraja.Config config = library.main().getConfig();
+            java.util.Map<String, Double> tables = java.util.Map.of();
+            try {
+                bms.player.beatoraja.TableData[] read =
+                        new bms.player.beatoraja.TableDataAccessor(config.getTablepath()).readAll();
+                // the player's table order decides between tables of the same kind
+                List<String> order = config.getTableURL() == null ? List.of() : java.util.Arrays.asList(config.getTableURL());
+                java.util.Arrays.sort(read, java.util.Comparator.comparingInt(table -> {
+                    int index = order.indexOf(table.getUrl());
+                    return index < 0 ? Integer.MAX_VALUE : index;
+                }));
+                tables = MixDifficulty.index(read);
+            } catch (RuntimeException e) {
+                logger.warn("NONSTOP MIX: could not read difficulty tables", e);
+            }
+            return new Difficulties(tables, library.main().getInfoDatabase());
+        }
+
+        double of(SongData song) {
+            double axis = MixDifficulty.lookup(tables, song.getSha256(), song.getMd5());
+            if (!Double.isNaN(axis)) {
+                return axis;
+            }
+            double peak = song.getInformation() != null ? song.getInformation().getPeakdensity() : 0;
+            return MixDifficulty.estimate(song.getNotes(), song.getLength(), peak, song.getLevel());
+        }
+
+        /** Loads peak densities in a few queries for songs that are on no table. */
+        void fillInformation(List<SongData> songs) {
+            if (info == null) {
+                return;
+            }
+            java.util.Map<String, List<SongData>> missing = new java.util.HashMap<>();
+            for (SongData song : songs) {
+                String sha256 = song.getSha256();
+                if (song.getInformation() == null && sha256 != null && HASH.matcher(sha256).matches()
+                        && Double.isNaN(MixDifficulty.lookup(tables, sha256, song.getMd5()))) {
+                    missing.computeIfAbsent(sha256.toLowerCase(Locale.ROOT), key -> new ArrayList<>()).add(song);
+                }
+            }
+            List<String> hashes = new ArrayList<>(missing.keySet());
+            for (int from = 0; from < hashes.size(); from += INFO_CHUNK) {
+                StringBuilder where = new StringBuilder("sha256 IN (");
+                for (int i = from; i < Math.min(hashes.size(), from + INFO_CHUNK); i++) {
+                    where.append(i == from ? "'" : ",'").append(hashes.get(i)).append('\'');
+                }
+                where.append(')');
+                try {
+                    for (bms.player.beatoraja.song.SongInformation found : info.getInformations(where.toString())) {
+                        List<SongData> owners = found.getSha256() == null ? null
+                                : missing.get(found.getSha256().toLowerCase(Locale.ROOT));
+                        if (owners != null) {
+                            for (SongData owner : owners) {
+                                owner.setInformation(found);
+                            }
+                        }
+                    }
+                } catch (RuntimeException e) {
+                    logger.warn("NONSTOP MIX: could not read song information", e);
+                    return;
+                }
+            }
+        }
     }
 
     private static String text(String japanese, String english) {

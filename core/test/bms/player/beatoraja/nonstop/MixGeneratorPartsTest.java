@@ -13,7 +13,87 @@ class MixGeneratorPartsTest {
 
     static MixSequencer.Candidate song(String title, String genre, double bpm, int level) {
         return new MixSequencer.Candidate(String.format("%064x", Math.abs(title.hashCode())), "", title,
-                "artist " + title, genre, bpm, true, 120_000L, 800, level, "/songs/" + title);
+                "artist " + title, genre, bpm, true, 120_000L, 800, level, level, "/songs/" + title + "/chart.bms");
+    }
+
+    static MixSequencer.Candidate chart(String title, String artist, String folder, double difficulty) {
+        return new MixSequencer.Candidate(String.format("%064x", Math.abs((title + folder + difficulty).hashCode())), "",
+                title, artist, "TECHNO", 140, true, 120_000L, 1500, 12, difficulty, folder + "/" + title + ".bms");
+    }
+
+    @Test
+    void sequencerUsesOneChartPerSong() {
+        List<MixSequencer.Candidate> pool = new ArrayList<>();
+        // four charts of one song in one folder, as the operator saw with AIR
+        for (String chart : new String[] {"[NORMAL]", "[HYPER]", "[ANOTHER]", "[INSANE]"}) {
+            pool.add(chart("AIR " + chart, "artist / obj:" + chart, "/songs/air", 20));
+        }
+        // the same song in another folder (package copy) is caught by title and artist
+        pool.add(chart("ＡＩＲ -LEGGENDARIA-", "Artist", "/pack/air-copy", 20));
+        for (int i = 0; i < 12; i++) {
+            pool.add(chart("other " + i, "someone " + i, "/songs/other" + i, 20));
+        }
+        MixSequencer.Settings settings = new MixSequencer.Settings();
+        settings.targetMs = 20 * 60_000L;
+        settings.curve = MixSequencer.Curve.FLAT;
+        for (long seed = 0; seed < 8; seed++) {
+            settings.seed = seed;
+            List<MixSequencer.Candidate> set = MixSequencer.sequence(pool, List.of(), null, settings);
+            long air = set.stream().filter(c -> c.title().contains("AIR")).count();
+            assertTrue(air <= 1, "seed " + seed + ": " + set);
+        }
+        // a locked chart of the song keeps its place and keeps the other charts out
+        MixSequencer.Candidate locked = chart("AIR [SPECIAL]", "artist", "/elsewhere/air", 20);
+        settings.seed = 3;
+        List<MixSequencer.Candidate> set = MixSequencer.sequence(pool,
+                List.of(new MixSequencer.Fixed(1, locked)), null, settings);
+        assertEquals(locked, set.get(1));
+        assertEquals(1, set.stream().filter(c -> c.title().contains("AIR")).count(), set.toString());
+    }
+
+    @Test
+    void sameFolderIsTheSameSongEvenWithDifferentTitles() {
+        MixSequencer.Candidate a = chart("Song A", "x", "/songs/pack", 15);
+        MixSequencer.Candidate b = chart("Totally different", "y", "/songs/pack", 15);
+        MixSequencer.Candidate c = chart("Song C", "z", "/songs/c", 15);
+        MixSequencer.Settings settings = new MixSequencer.Settings();
+        settings.targetMs = 60 * 60_000L;
+        List<MixSequencer.Candidate> set = MixSequencer.sequence(List.of(a, b, c), List.of(), null, settings);
+        assertEquals(2, set.size(), set.toString());
+        assertTrue(set.contains(c));
+        // reordering keeps every song, duplicates included
+        settings.oneChartPerSong = false;
+        settings.maxTracks = 3;
+        assertEquals(3, MixSequencer.sequence(List.of(a, b, c), List.of(), null, settings).size());
+    }
+
+    @Test
+    void songKeyIgnoresChartDecorations() {
+        assertEquals(chart("AIR [ANOTHER]", "Composer / obj: A", "/a", 1).songKey(),
+                chart("ＡＩＲ (7keys)", "composer obj.B", "/b", 1).songKey());
+        assertNotEquals(chart("AIR", "x", "/a", 1).songKey(), chart("AIR", "y", "/a", 1).songKey());
+        assertFalse(chart("[ ]", "x", "/a", 1).songKey().startsWith("|"));
+    }
+
+    @Test
+    void sequencerFollowsTheDifficultyAxisAndRange() {
+        List<MixSequencer.Candidate> pool = new ArrayList<>();
+        for (int i = 0; i < 60; i++) {
+            // #PLAYLEVEL says 12 for all of them; only the axis tells them apart
+            pool.add(chart("song " + i, "artist " + i, "/songs/" + i, 1 + i % 37));
+        }
+        MixSequencer.Settings settings = new MixSequencer.Settings();
+        settings.targetMs = 16 * 60_000L;
+        settings.curve = MixSequencer.Curve.RISING;
+        settings.minDifficulty = MixDifficulty.Scale.INSANE.lower(5);
+        settings.maxDifficulty = MixDifficulty.Scale.INSANE.upper(15);
+        settings.seed = 7;
+        List<MixSequencer.Candidate> set = MixSequencer.sequence(pool, List.of(), null, settings);
+        assertTrue(set.size() >= 6, set.toString());
+        assertTrue(set.stream().allMatch(c -> c.difficulty() >= 17 && c.difficulty() <= 27), set.toString());
+        double firstHalf = set.subList(0, set.size() / 2).stream().mapToDouble(MixSequencer.Candidate::difficulty).average().orElse(0);
+        double secondHalf = set.subList(set.size() / 2, set.size()).stream().mapToDouble(MixSequencer.Candidate::difficulty).average().orElse(0);
+        assertTrue(secondHalf > firstHalf + 3, firstHalf + " -> " + secondHalf);
     }
 
     @Test
