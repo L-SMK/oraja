@@ -81,6 +81,33 @@ public final class MixSequencer {
         ANY
     }
 
+    /**
+     * How far "same genre only" reaches (#565). When too few songs match, the
+     * generator widens it step by step instead of making a one-song set.
+     */
+    public enum GenreReach {
+        /** The same genre name (or the chosen family). */
+        EXACT,
+        /** Genres sharing a word ("Brutal Hardcore" and "Hardcore"). */
+        WORD,
+        /** The genre's broad family ({@link MixGenreFamily}). */
+        FAMILY,
+        /** Every genre; close genres are still preferred by the cost. */
+        ALL
+    }
+
+    /**
+     * @param reach        how far the genre rule had to reach
+     * @param genre        the genre name the set follows (empty with a family or none)
+     * @param exactMatches songs matching at the first step (-1 when the rule does not filter)
+     */
+    public record Selection(List<Candidate> songs, GenreReach reach, String genre, int exactMatches) {
+        /** True when the set had to use genres beyond the requested one. */
+        public boolean widened() {
+            return exactMatches >= 0 && reach != GenreReach.EXACT;
+        }
+    }
+
     public enum Curve {
         FLAT, RISING, FALLING, WAVE, PEAK_END;
 
@@ -166,10 +193,91 @@ public final class MixSequencer {
      * @return the chosen songs in order; empty when nothing fits
      */
     public static List<Candidate> sequence(List<Candidate> pool, List<Fixed> fixed, Candidate first, Settings settings) {
-        Random random = new Random(settings.seed);
-        String referenceGenre = settings.genre == null || settings.genre.isBlank()
+        return select(pool, fixed, first, settings).songs();
+    }
+
+    /** Like {@link #sequence}, and also reports how far the genre rule had to reach. */
+    public static Selection select(List<Candidate> pool, List<Fixed> fixed, Candidate first, Settings settings) {
+        String referenceGenre = referenceGenre(settings, fixed, first);
+        if (!filtersGenre(settings, referenceGenre)) {
+            return new Selection(run(pool, fixed, first, settings, referenceGenre, GenreReach.ALL),
+                    GenreReach.ALL, referenceGenre, -1);
+        }
+        int needed = neededSongs(settings, fixed.size() + (first != null ? 1 : 0));
+        int exact = -1;
+        for (GenreReach reach : reaches(settings, referenceGenre)) {
+            int count = eligible(pool, fixed, first, settings, referenceGenre, reach).usable().size();
+            if (exact < 0) {
+                exact = count;
+            }
+            if (count >= needed || reach == GenreReach.ALL) {
+                return new Selection(run(pool, fixed, first, settings, referenceGenre, reach), reach, referenceGenre, exact);
+            }
+        }
+        throw new IllegalStateException("the last reach takes every genre");
+    }
+
+    static String referenceGenre(Settings settings, List<Fixed> fixed, Candidate first) {
+        return settings.genre == null || settings.genre.isBlank()
                 ? (first != null ? first.genre() : fixed.isEmpty() ? "" : fixed.get(0).candidate().genre())
                 : settings.genre;
+    }
+
+    private static boolean filtersGenre(Settings settings, String referenceGenre) {
+        return settings.genreRule == GenreRule.STRICT
+                && (settings.genreFamily != null || !normalizeGenre(referenceGenre).isEmpty());
+    }
+
+    /** The widening steps for the rule: a chosen family can only widen to every genre. */
+    static List<GenreReach> reaches(Settings settings, String referenceGenre) {
+        if (settings.genreFamily != null) {
+            return List.of(GenreReach.EXACT, GenreReach.ALL);
+        }
+        List<GenreReach> reaches = new ArrayList<>(List.of(GenreReach.EXACT, GenreReach.WORD));
+        if (!MixGenreFamily.of(referenceGenre).isEmpty()) {
+            reaches.add(GenreReach.FAMILY);
+        }
+        reaches.add(GenreReach.ALL);
+        return reaches;
+    }
+
+    /** Songs the set still needs besides the fixed ones, from the target length and the song limit. */
+    static int neededSongs(Settings settings, int fixedSongs) {
+        int room = Math.max(1, settings.maxTracks - fixedSongs);
+        long perSong = Math.max(30_000L, (settings.segmentMs > 0 ? settings.segmentMs : 120_000L) - settings.joinMs);
+        long target = Math.min(settings.targetMs, Long.MAX_VALUE / 8);
+        long songs = (target + perSong - 1) / perSong;
+        return (int) Math.min(room, Math.max(2L, songs));
+    }
+
+    /** Whether a #GENRE passes "same genre only" at the given reach. */
+    static boolean genreMatches(String genre, String referenceGenre, MixGenreFamily family, GenreReach reach) {
+        if (reach == GenreReach.ALL) {
+            return true;
+        }
+        if (family != null) {
+            return family.matches(genre);
+        }
+        String normalized = normalizeGenre(genre);
+        if (normalized.isEmpty()) {
+            return false;
+        }
+        boolean same = normalized.equals(normalizeGenre(referenceGenre));
+        return switch (reach) {
+            case EXACT -> same;
+            case WORD -> same || genreCost(referenceGenre, genre) < 1.0;
+            case FAMILY -> same || genreCost(referenceGenre, genre) < 1.0
+                    || MixGenreFamily.of(referenceGenre).stream().anyMatch(f -> f.matches(genre));
+            case ALL -> true;
+        };
+    }
+
+    private record Eligible(List<Candidate> usable, List<List<String>> keys) {
+    }
+
+    private static Eligible eligible(List<Candidate> pool, List<Fixed> fixed, Candidate first, Settings settings,
+            String referenceGenre, GenreReach reach) {
+        boolean filter = filtersGenre(settings, referenceGenre);
         // songs the set already has to contain: no other chart of them may be picked
         Set<String> reserved = new HashSet<>();
         if (settings.oneChartPerSong) {
@@ -189,12 +297,7 @@ public final class MixSequencer {
             if (candidate.lengthMs() > 0 && candidate.lengthMs() < 30_000L) {
                 continue;
             }
-            if (settings.genreRule == GenreRule.STRICT && settings.genreFamily != null
-                    && !settings.genreFamily.matches(candidate.genre())) {
-                continue;
-            }
-            if (settings.genreRule == GenreRule.STRICT && settings.genreFamily == null && !referenceGenre.isBlank()
-                    && !normalizeGenre(candidate.genre()).equals(normalizeGenre(referenceGenre))) {
+            if (filter && !genreMatches(candidate.genre(), referenceGenre, settings.genreFamily, reach)) {
                 continue;
             }
             List<String> keys = settings.oneChartPerSong ? candidate.sameSongKeys() : List.of("#" + usable.size());
@@ -204,6 +307,15 @@ public final class MixSequencer {
             usable.add(candidate);
             usableKeys.add(keys);
         }
+        return new Eligible(usable, usableKeys);
+    }
+
+    private static List<Candidate> run(List<Candidate> pool, List<Fixed> fixed, Candidate first, Settings settings,
+            String referenceGenre, GenreReach reach) {
+        Random random = new Random(settings.seed);
+        Eligible eligible = eligible(pool, fixed, first, settings, referenceGenre, reach);
+        List<Candidate> usable = eligible.usable();
+        List<List<String>> usableKeys = eligible.keys();
         double[] levels = {
                 Math.max(settings.minDifficulty, minDifficulty(usable)),
                 Math.min(settings.maxDifficulty, maxDifficulty(usable))};

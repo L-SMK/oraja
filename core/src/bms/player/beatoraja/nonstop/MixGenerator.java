@@ -322,7 +322,11 @@ public final class MixGenerator {
         if (request.scope == Scope.EVERYTHING && pool.size() < 3) {
             notes.add(text("条件に合う曲が少なすぎます", "Very few songs match the conditions"));
         }
-        List<MixSequencer.Candidate> order = MixSequencer.sequence(pool, fixed, reference, settings);
+        MixSequencer.Selection selection = MixSequencer.select(pool, fixed, reference, settings);
+        if (selection.widened()) {
+            notes.add(widenedNote(selection, settings.genreFamily));
+        }
+        List<MixSequencer.Candidate> order = selection.songs();
         List<MixTrack> tracks = new ArrayList<>();
         for (MixSequencer.Candidate candidate : order) {
             MixTrack track = existing.get(candidate);
@@ -491,6 +495,58 @@ public final class MixGenerator {
                 }
             }
         }
+    }
+
+    /**
+     * Songs of the player's library per widening step of "same genre only",
+     * for the generator screen (#565): {exact, sharing a word, same family}.
+     * Reads the song database, so call it off the render thread.
+     */
+    public static int[] genreCounts(MixLibrary library, int modeId, String genre, MixGenreFamily family) {
+        if (library.main() == null || library.main().getSongDatabase() == null) {
+            return new int[3];
+        }
+        List<MixSequencer.Candidate> pool = new ArrayList<>();
+        for (SongData song : library.main().getSongDatabase().getSongDatasByMode(modeId, POOL_LIMIT)) {
+            if (song.getPath() != null && song.getNotes() > 0) {
+                pool.add(candidate(song, 0));
+            }
+        }
+        return genreCounts(pool, genre, family);
+    }
+
+    /** Distinct songs (one per song, not per chart) matching each step. */
+    static int[] genreCounts(List<MixSequencer.Candidate> pool, String genre, MixGenreFamily family) {
+        MixSequencer.GenreReach[] steps = {MixSequencer.GenreReach.EXACT, MixSequencer.GenreReach.WORD,
+                MixSequencer.GenreReach.FAMILY};
+        int[] counts = new int[steps.length];
+        for (int i = 0; i < steps.length; i++) {
+            java.util.Set<String> songs = new java.util.HashSet<>();
+            for (MixSequencer.Candidate candidate : pool) {
+                if (candidate.lengthMs() > 0 && candidate.lengthMs() < 30_000L) {
+                    continue;
+                }
+                if (MixSequencer.genreMatches(candidate.genre(), genre, family, steps[i])) {
+                    songs.add(candidate.songKey());
+                }
+            }
+            counts[i] = songs.size();
+        }
+        return counts;
+    }
+
+    /** Says that "same genre only" had too few songs and which genres were used instead (#565). */
+    static String widenedNote(MixSequencer.Selection selection, MixGenreFamily family) {
+        String genre = family != null
+                ? family.label(!bms.player.beatoraja.arena.bmsir.BMSIRArenaI18n.isEnglish())
+                : selection.genre();
+        String wider = switch (selection.reach()) {
+            case WORD -> text("名前の一部が同じジャンル", "genres sharing a word");
+            case FAMILY -> text("同じ系統のジャンル", "genres of the same family");
+            default -> text("近いジャンルを優先してほかのジャンル", "other genres, closest first");
+        };
+        return String.format(Locale.ROOT, text("ジャンル「%s」の曲が%d曲しかないため、%sも使いました",
+                "Only %2$d songs have the genre \"%1$s\", so %3$s were used too"), genre, selection.exactMatches(), wider);
     }
 
     private static String text(String japanese, String english) {
