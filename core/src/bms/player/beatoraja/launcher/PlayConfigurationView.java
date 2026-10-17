@@ -156,6 +156,14 @@ public class PlayConfigurationView implements Initializable {
 	private Tab otherTab;
 	@FXML
 	private Tab bmsirSpecificTab;
+	private Tab hispeedTab;
+	private final ComboBox<String> hispeedKind = new ComboBox<>();
+	private final Spinner<Integer> hispeedGreenNumber = new Spinner<>();
+	private VBox hispeedLegacyGroup, hispeedLr2Group, hispeedFloatingGroup;
+	private VBox hispeedCoverSteps;
+	private final CheckBox bgaDisplay = new CheckBox();
+	private HBox hispeedGreenRow, hispeedMultiplierRow;
+	private boolean updatingHispeedUi;
 	@FXML
 	private Tab irTab;
 	@FXML
@@ -227,6 +235,16 @@ public class PlayConfigurationView implements Initializable {
 	private Spinner<Integer> bmsirBaseScrollSpeed;
 	@FXML
 	private Spinner<Integer> bmsirHispeedReferenceBpm;
+	@FXML
+	private CheckBox bmsirFloatingHispeedEnabled;
+	@FXML
+	private Spinner<Double> bmsirFloatingHispeed;
+	@FXML
+	private Spinner<Integer> bmsirFloatingGreen;
+	@FXML
+	private Label bmsirFloatingMultiplierLabel;
+	@FXML
+	private Label bmsirFloatingGreenLabel;
 	@FXML
 	private CheckBox bmsirJudgeRankSortEnabled;
 	@FXML
@@ -406,6 +424,8 @@ public class PlayConfigurationView implements Initializable {
 	@FXML
 	private CheckBox chartpreview;
 	@FXML
+	private CheckBox endplayatlastnote;
+	@FXML
 	private CheckBox guidese;
 	@FXML
 	private CheckBox windowhold;
@@ -514,6 +534,9 @@ public class PlayConfigurationView implements Initializable {
 	public CheckBox clipboardScreenshot;
 	@FXML
 	private ComboBox<ScreenShotFormat> screenshotFormat;
+    @FXML private CheckBox screenshotSound;
+    @FXML private Slider screenshotSoundVolume;
+    @FXML private CheckBox replayLaneSettings;
 
 	static void initComboBox(ComboBox<Integer> combo, final String[] values) {
 		combo.setCellFactory((param) -> new OptionListCell(values));
@@ -670,6 +693,12 @@ public class PlayConfigurationView implements Initializable {
 				)
 		);
 		bmsirHispeedMode.getItems().setAll(PlayMode.values());
+		bmsirFloatingHispeed.setValueFactory(new SpinnerValueFactory.DoubleSpinnerValueFactory(0.5, 10, 2, 0.5));
+		bmsirFloatingGreen.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(10, 6000, 300));
+		bmsirFloatingMultiplierLabel.setLabelFor(bmsirFloatingHispeed);
+		bmsirFloatingGreenLabel.setLabelFor(bmsirFloatingGreen);
+		bmsirFloatingHispeed.disableProperty().bind(bmsirFloatingHispeedEnabled.selectedProperty().not());
+		bmsirFloatingGreen.disableProperty().bind(bmsirFloatingHispeedEnabled.selectedProperty().not());
 		bmsirBaseScrollSpeed.disableProperty().bind(
 				bmsirLr2HispeedFixEnabled.selectedProperty().not()
 		);
@@ -737,12 +766,125 @@ public class PlayConfigurationView implements Initializable {
 		discordController.init(this);
 		obsController.init(this);
 		screenshotFormat.getItems().setAll(ScreenShotFormat.values());
+        screenshotSoundVolume.disableProperty().bind(screenshotSound.selectedProperty().not());
+		initializeHispeedTab(arg1);
 		initializeModMenuSettings();
 		initializeConfigurationShell(arg1);
 
 		checkNewVersion();
 		logger.info("初期化時間(ms) : " + (System.currentTimeMillis() - t));
 	}
+
+	private void initializeHispeedTab(ResourceBundle bundle) {
+		hispeedKind.setId("hispeedKind");
+		hispeedKind.getItems().setAll(uiText("通常", "Normal"), "LR2", uiText("フローティング", "Floating"));
+		hispeedKind.getSelectionModel().select(0);
+		hispeedGreenNumber.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(1, 6000, 300));
+		hispeedGreenNumber.setEditable(true);
+		Set<String> movedLabels = new HashSet<>();
+		for (String key : new String[]{"HISPEED", "GVALUE", "HISPEED_FIX", "HISPEED_MARGIN",
+				"LANECOVER_MARGIN_LOW", "LANECOVER_MARGIN_HIGH", "LANECOVER_SWITCH_DURATION"}) {
+			if (bundle.containsKey(key)) movedLabels.add(bundle.getString(key));
+		}
+		removeHispeedLabels(optionTab.getContent(), movedLabels);
+		moveSpeedControl(gvalue);
+		Pane legacy = (Pane) bmsirLr2HispeedFixEnabled.getParent();
+		int first = legacy.getChildren().indexOf(bmsirLr2HispeedFixEnabled);
+		Node last = bmsirHispeedReferenceBpm.getParent();
+		int end = legacy.getChildren().indexOf(last);
+		legacy.getChildren().remove(first, end + 1);
+		hispeedGreenRow = speedRow(uiText("緑数字", "Green number"), hispeedGreenNumber);
+		hispeedMultiplierRow = speedRow("HI-SPEED", moveSpeedControl(hispeed));
+		hispeedLegacyGroup = new VBox(12, speedRow("HI-SPEED FIX", moveSpeedControl(fixhispeed)),
+				hispeedGreenRow, hispeedMultiplierRow,
+				speedRow(uiText("倍率の変更幅", "Speed step"), moveSpeedControl(hispeedmargin)),
+				moveSpeedControl(hispeedautoadjust));
+		hispeedLr2Group = new VBox(12, speedRow(uiText("基本スクロール", "Base scroll"), moveSpeedControl(bmsirBaseScrollSpeed)),
+				speedRow(uiText("基準BPM", "Reference BPM"), moveSpeedControl(bmsirHispeedReferenceBpm)));
+		hispeedFloatingGroup = new VBox(12,
+				speedRow(uiText("緑数字", "Green number"), moveSpeedControl(bmsirFloatingGreen)),
+				new Label(uiText("倍率は曲開始時に緑数字とBPMから決まります。START＋鍵盤は倍率±0.50相当で緑数字を変えます。",
+						"The multiplier follows the green number and BPM at song start. START + keys change the green number by a ±0.50 multiplier step.")));
+		hispeedCoverSteps = new VBox(12,
+				speedRow(uiText("カバー変更幅（低速）", "Cover step (slow)"), moveSpeedControl(lanecovermarginlow)),
+				speedRow(uiText("カバー変更幅（高速）", "Cover step (fast)"), moveSpeedControl(lanecovermarginhigh)),
+				speedRow(uiText("切替時間（ms）", "Step switch time (ms)"), moveSpeedControl(lanecoverswitchduration)));
+		VBox cover = new VBox(12, new Label(uiText("カバー・LIFT（このモードの全方式で共通）", "Covers and LIFT (shared across speed modes)")),
+				speedRow(uiText("レーンカバー", "Lane Cover"), moveSpeedControl(enableLanecover), moveSpeedControl(lanecover)),
+				speedRow("LIFT", moveSpeedControl(enableLift), moveSpeedControl(lift)),
+				speedRow("HIDDEN", moveSpeedControl(enableHidden), moveSpeedControl(hidden)),
+				hispeedCoverSteps);
+		bgaDisplay.setText(uiText("BGAを表示", "Show BGA")); bgaDisplay.setSelected(true);
+		bgaDisplay.setOnAction(event -> { if (player != null) player.setBmsirBgaDisplayEnabled(bgaDisplay.isSelected()); });
+		VBox page = new VBox(18, speedRow(uiText("対象モード", "Key mode"), moveSpeedControl(bmsirHispeedMode)),
+				speedRow(uiText("方式", "Speed mode"), hispeedKind), hispeedLegacyGroup, hispeedLr2Group, hispeedFloatingGroup,
+				new Separator(), cover, new Separator(), bgaDisplay);
+		page.setPadding(new Insets(20));
+		ScrollPane scroll = new ScrollPane(page); scroll.setFitToWidth(true);
+		hispeedTab = new Tab(uiText("ハイスピード", "HI-SPEED"), scroll); hispeedTab.setClosable(false);
+		configurationTabs.getTabs().add(configurationTabs.getTabs().indexOf(optionTab) + 1, hispeedTab);
+		hispeedKind.valueProperty().addListener((obs, old, value) -> {
+			if (!updatingHispeedUi && player != null && bmsirHispeedPc != null) {
+				updatePlayConfig();
+				PlayConfig conf = player.getPlayConfig(Mode.valueOf(bmsirHispeedPc.name())).getPlayconfig();
+				conf.setBmsirHispeedMode(speedModeForIndex(hispeedKind.getSelectionModel().getSelectedIndex()));
+				bmsirFloatingHispeedEnabled.setSelected(conf.isBmsirFloatingHispeedEnabled());
+				hispeed.getValueFactory().setValue((double) (PlayConfig.HISPEED_MODE_LR2.equals(conf.getBmsirHispeedMode()) ? conf.getEffectiveLr2Hispeed() : conf.getHispeed()));
+			}
+			refreshHispeedVisibility();
+		});
+		hispeedGreenNumber.valueProperty().addListener((obs, old, value) -> {
+			if (!updatingHispeedUi && value != null) gvalue.getValueFactory().setValue(Math.round(value * 5f / 3f));
+		});
+		fixhispeed.valueProperty().addListener((obs, old, value) -> refreshHispeedVisibility());
+		configurationTabs.getSelectionModel().selectedItemProperty().addListener((obs, old, selected) -> {
+			if (selected == hispeedTab && playconfig.getValue() != null) bmsirHispeedMode.setValue(playconfig.getValue());
+		});
+		bmsirBaseScrollSpeed.disableProperty().unbind(); bmsirHispeedReferenceBpm.disableProperty().unbind();
+		bmsirFloatingHispeed.disableProperty().unbind(); bmsirFloatingGreen.disableProperty().unbind();
+		refreshHispeedVisibility();
+	}
+
+	static String speedModeForIndex(int index) {
+		return index == 1 ? PlayConfig.HISPEED_MODE_LR2 : index == 2 ? PlayConfig.HISPEED_MODE_FLOATING : PlayConfig.HISPEED_MODE_NORMAL;
+	}
+
+	static int normalDurationForGreen(int currentDuration, int green) {
+		return currentDuration * 3 / 5 == green ? currentDuration
+				: Math.max(1, Math.min(PlayConfig.DURATION_MAX, Math.round(green * 5f / 3f)));
+	}
+
+	private static Node moveSpeedControl(Node node) {
+		if (node.getParent() instanceof Pane pane) pane.getChildren().remove(node);
+		return node;
+	}
+
+	private static void removeHispeedLabels(Node node, Set<String> labels) {
+		if (node instanceof Pane pane) {
+			for (Node child : List.copyOf(pane.getChildren())) removeHispeedLabels(child, labels);
+			pane.getChildren().removeIf(child -> child instanceof Label label && labels.contains(label.getText()));
+		} else if (node instanceof ScrollPane scroll) removeHispeedLabels(scroll.getContent(), labels);
+	}
+
+	private static HBox speedRow(String title, Node... controls) {
+		Label label = new Label(title); label.setMinWidth(185); if (controls.length > 0) label.setLabelFor(controls[0]);
+		HBox row = new HBox(12, label); row.getChildren().addAll(controls); row.setAlignment(Pos.CENTER_LEFT); return row;
+	}
+
+	private void refreshHispeedVisibility() {
+		if (hispeedLegacyGroup == null) return;
+		int selected = hispeedKind.getSelectionModel().getSelectedIndex();
+		setSpeedSectionVisible(hispeedLegacyGroup, selected != 2);
+		setSpeedSectionVisible(hispeedLr2Group, selected == 1);
+		setSpeedSectionVisible(hispeedFloatingGroup, selected == 2);
+		setSpeedSectionVisible(hispeedCoverSteps, selected != 2);
+		boolean fixed = fixhispeed.getValue() != null && fixhispeed.getValue() != PlayConfig.FIX_HISPEED_OFF;
+		setSpeedSectionVisible(hispeedGreenRow, selected == 0 && fixed);
+		setSpeedSectionVisible(hispeedMultiplierRow, selected == 1 || !fixed);
+		setSpeedSectionVisible(hispeedautoadjust, selected == 0);
+	}
+
+	private static void setSpeedSectionVisible(Node node, boolean visible) { node.setVisible(visible); node.setManaged(visible); }
 
 	private void initializeModMenuSettings() {
 		modMenuFilter.setText(uiText("項目フィルターを有効にする", "Enable item filter"));
@@ -1067,6 +1209,7 @@ public class PlayConfigurationView implements Initializable {
 		registerTabHelp(resourceTab, "リソース", "BMSフォルダ、難易度表、楽曲データベースの更新方法を管理します。", "Resources", "Manage BMS folders, difficulty tables, and song database updates.", HelpGraphic.RESOURCE);
 		registerTabHelp(musicselectTab, "選曲", "選曲画面の移動、プレビュー、検索と表示方法を調整します。", "Music Select", "Adjust navigation, previews, search, and presentation in Music Select.", HelpGraphic.MUSIC);
 		registerTabHelp(optionTab, "プレイ OP", "プレイ中の見え方・譜面オプション・ゲージを設定します。本体と同じ項目順のまま、各設定の説明を追加しています。", "Play Options", "Configure note visibility, chart options, and gauges in the original order, with an explanation for every setting.", HelpGraphic.PLAY);
+		registerTabHelp(hispeedTab, "ハイスピード", "鍵盤モード別に通常・LR2・フローティングを選び、速度とカバーを設定します。", "HI-SPEED", "Choose Normal, LR2, or Floating for each key mode and configure speed and covers.", HelpGraphic.PLAY);
 		registerTabHelp(skinTab, "スキン", "使用するスキンとスキン固有の項目、BGM・効果音フォルダを選びます。", "Skin", "Choose skins, skin-specific values, BGM, and sound folders.", HelpGraphic.SKIN);
 		registerTabHelp(otherTab, "その他", "設定画面の表示方式、キャッシュ、ダウンロードなどの補助設定です。", "Other", "Auxiliary settings for the configuration layout, cache, and downloads.", HelpGraphic.OTHER);
 		registerTabHelp(bmsirSpecificTab, "BMS-IR固有設定", "BMS-IR向けの操作、表示、同期、ショートカットを設定します。", "BMS-IR Features", "Configure BMS-IR controls, presentation, synchronization, and shortcuts.", HelpGraphic.BMSIR);
@@ -1092,6 +1235,7 @@ public class PlayConfigurationView implements Initializable {
 		registerControlHelp("songPreview", "楽曲プレビュー", "選曲中の試聴をOFF、1回、ループから選びます。", "Song preview", "Choose off, one-shot, or looping audio preview in Music Select.", HelpGraphic.MUSIC);
 		registerControlHelp("hispeed", "HI-SPEED", "ノーツのスクロール速度倍率です。", "HI-SPEED", "Set the note scroll-speed multiplier.", HelpGraphic.PLAY);
 		registerControlHelp("gvalue", "ノーツ表示時間", "ノーツが判定位置へ届くまでの表示時間、いわゆる緑数字です。単位はmsです。", "Note display time", "Set the time until notes reach the judgment line, commonly called green number, in ms.", HelpGraphic.PLAY);
+		registerControlHelp("endplayatlastnote", "最終ノーツ後すぐに終了", "最後のノーツ（LN終端を含む）の判定が確定したら、余韻を待たずにリザルトへ進みます。スコアと判定は変わりません。", "End play at last note", "Goes to the result as soon as the last note (including LN ends) is judged, without the trailing wait. Score and judgments are unchanged.", HelpGraphic.PLAY);
 		registerControlHelp("chartpreview", "チャートプレビュー", "楽曲ロード中にSTARTまたはSELECTを押している間、プレイ画面上で譜面の流れを先行表示します。選曲時の試聴機能ではありません。", "Chart Preview", "While loading, hold START or SELECT to preview chart movement on the play field. This is not the Music Select audio preview.", HelpGraphic.PLAY);
 		registerControlHelp("configurationLayout", "設定画面", "クラシックは従来の上タブ、サイドバーは左側のカテゴリと図付き説明を使用します。設定項目と保存内容は共通です。", "Configuration screen", "Classic uses the existing top tabs; Sidebar uses left categories and illustrated help. Both edit the same settings.", HelpGraphic.OTHER);
 		registerControlHelp("irpassword", "Password", "IRへログインするためのパスワードです。画面上では伏せて表示されます。", "Password", "The IR login password; it remains masked on screen.", HelpGraphic.IR);
@@ -1506,6 +1650,12 @@ public class PlayConfigurationView implements Initializable {
 						sidebarSettingRow(otherTab, "clipboardScreenshot", "スクリーンショットをクリップボードへコピー", "Copy screenshots to clipboard",
 								"スクリーンショット保存時、画像データをOSのクリップボードにもコピーします。",
 								"Copy image data to the OS clipboard whenever a screenshot is saved."),
+                        sidebarSettingRow(otherTab, "screenshotSound", "スクショ保存音", "Screenshot sound",
+                                "保存に成功したときだけ通知音を鳴らします。初期OFF。", "Play a sound only after saving successfully. Off by default."),
+                        sidebarSettingRow(otherTab, "screenshotSoundVolume", "スクショ保存音量", "Screenshot sound volume",
+                                "システム音量に対する通知音の割合です。", "Notification level relative to system volume."),
+                        sidebarSettingRow(otherTab, "replayLaneSettings", "リプレイの表示設定を再現", "Restore replay lane settings",
+                                "記録されたHS・カバー操作を再現します。普段の設定には書き戻しません。", "Replay recorded speed and cover settings without changing your saved settings."),
 						sidebarSettingRow(otherTab, "screenshotFormat", "スクリーンショット保存形式", "Screenshot format",
 								"保存形式をPNGまたはJPGから選びます。Webhook添付の形式も一致します。",
 								"Choose PNG or JPG; webhook attachments use the same format."),
@@ -1602,20 +1752,6 @@ public class PlayConfigurationView implements Initializable {
 								"ONでは、イグノアした曲・譜面も通常の一覧に表示します。OFFでは一覧から隠し、選曲ルートのIGNOREDフォルダーからだけ確認・解除できます。",
 								"When enabled, ignored songs and charts stay in ordinary lists. When disabled they are hidden and can be reviewed or restored only from the IGNORED folder at the Music Select root.")
 				),
-				sidebarSettingCard(
-						sidebarSettingRow(bmsirSpecificTab, "bmsirLr2HispeedFixEnabled", "LR2仕様のHI-SPEED固定", "LR2-style fixed HI-SPEED",
-								"モード別の基本スクロールと基準BPMで、既存のHI-SPEED FIX計算を上書きします。既定はOFFです。",
-								"Override the existing HI-SPEED FIX calculation with per-mode base scroll and reference BPM values. Off by default."),
-						sidebarSettingRow(bmsirSpecificTab, "対象モード", "Target mode",
-								"LR2仕様のHI-SPEED設定を編集する鍵盤モードを選びます。",
-								"Choose the key mode whose LR2-style HI-SPEED values you are editing.",
-								sidebarCombo(bmsirHispeedMode)),
-						sidebarSettingRow(bmsirSpecificTab, "bmsirBaseScrollSpeed", "基本スクロール", "Base scroll",
-								"100を等速として、選択したモードの速度倍率を設定します。",
-								"Set the speed multiplier for the selected mode, where 100 is 1.00x."),
-						sidebarSettingRow(bmsirSpecificTab, "bmsirHispeedReferenceBpm", "基準BPM", "Reference BPM",
-								"選択したモードの基準BPMを50～400の範囲で1刻みに調整します。初期値は150です。",
-								"Fine-tune the selected mode's reference BPM from 50 through 400 in steps of 1. The default is 150.")),
 				sidebarSettingCard(
 						sidebarSettingRow(bmsirSpecificTab, "bmsirArenaTargetMode", "Arenaターゲット", "Arena target",
 								"Arenaプレイ中のスコアグラフで比較対象にする相手を選びます。",
@@ -1847,38 +1983,14 @@ public class PlayConfigurationView implements Initializable {
 						"7K、14Kなど、どのプレイモードの設定を編集するかを選びます。",
 						"Choose which play mode, such as 7K or 14K, you are editing.",
 						sidebarCombo(playconfig)),
-				sidebarSettingRow("HI-SPEED", "HI-SPEED",
-						"ノーツのスクロール速度倍率です。",
-						"Sets the note scroll-speed multiplier.",
-						sidebarSpinner(hispeed)),
-				sidebarSettingRow("ノーツ表示時間", "Note display time",
-						"ノーツが判定位置へ届くまでの表示時間（いわゆる緑数字）です。単位は ms です。",
-						"Time until notes reach the judgment line, commonly called the green number. The unit is ms.",
-						sidebarSpinner(gvalue)),
-				sidebarSettingRow("レーンカバー", "Lane Cover",
-						"ONにするとレーン上部を隠します。右の数値が隠す量です。",
-						"When ON, hides the upper part of the lane. The value on the right is the cover amount.",
-						sidebarToggleWithValue(enableLanecover, sidebarSpinner(lanecover))),
-				sidebarSettingRow("変化間隔（低速）", "Change step (low)",
-						"低いHI-SPEED帯で、カバー操作1回あたりに変える量です。",
-						"Amount changed by one cover operation in the lower HI-SPEED range.",
-						sidebarSpinner(lanecovermarginlow)),
-				sidebarSettingRow("変化間隔（高速）", "Change step (high)",
-						"高いHI-SPEED帯で、カバー操作1回あたりに変える量です。",
-						"Amount changed by one cover operation in the higher HI-SPEED range.",
-						sidebarSpinner(lanecovermarginhigh)),
-				sidebarSettingRow("変化速度切り替え時間", "Change-speed switch time",
-						"カバー操作を長押ししたとき、低速から高速変更へ切り替わるまでの時間です。単位は ms です。",
-						"Time before a held cover operation switches from slow to fast changes, in ms.",
-						sidebarSpinner(lanecoverswitchduration)),
-				sidebarSettingRow("LIFT", "LIFT",
-						"ONにすると判定位置を上へ持ち上げます。右の数値が持ち上げる量です。",
-						"When ON, raises the judgment line. The value on the right is the lift amount.",
-						sidebarToggleWithValue(enableLift, sidebarSpinner(lift))),
-				sidebarSettingRow("HIDDEN", "HIDDEN",
-						"ONにするとレーン下側でノーツを隠します。右の数値が隠す量です。",
-						"When ON, hides notes near the bottom of the lane. The value on the right is the hidden amount.",
-						sidebarToggleWithValue(enableHidden, sidebarSpinner(hidden))),
+
+
+
+
+
+
+
+
 				sidebarSettingRow("ノーツ表示タイミング", "Note display timing",
 						"ノーツ描画だけを前後にずらします。音・判定タイミングは変わりません。",
 						"Offsets note drawing only. Audio and judgment timing do not change.",
@@ -1886,19 +1998,8 @@ public class PlayConfigurationView implements Initializable {
 				sidebarSettingRow("ノーツ表示タイミング自動調整", "Auto-adjust note display timing",
 						"プレイ結果に合わせてノーツ表示タイミングを自動調整します。",
 						"Automatically adjusts note display timing from play results.",
-						sidebarToggle(notesdisplaytimingautoadjust)),
-				sidebarSettingRow("ハイスピード固定", "HI-SPEED fix",
-						"BPMが変化する譜面で、どのBPMを基準にスクロール速度を固定するかを選びます。",
-						"Choose which BPM is used to keep scroll speed stable on charts with BPM changes.",
-						sidebarCombo(fixhispeed)),
-				sidebarSettingRow("HI-SPEED変化間隔", "HI-SPEED change step",
-						"プレイ中にHI-SPEEDを変更するときの1回あたりの変化量です。",
-						"Amount changed by one HI-SPEED operation during play.",
-						sidebarSpinner(hispeedmargin)),
-				sidebarSettingRow("HI-SPEED固定自動調整", "Auto-adjust HI-SPEED fix",
-						"レーンカバー変更時に、現在のBPMへHI-SPEED固定を自動で合わせます。",
-						"Automatically updates the HI-SPEED fix for the current BPM when Lane Cover changes.",
-						sidebarToggle(hispeedautoadjust))
+						sidebarToggle(notesdisplaytimingautoadjust))
+
 		);
 
 		VBox chart = sidebarSettingCard(
@@ -2051,7 +2152,11 @@ public class PlayConfigurationView implements Initializable {
 				sidebarSettingRow("チャートプレビュー", "Chart Preview",
 						"楽曲ロード中にSTARTまたはSELECTを押している間、プレイ画面で譜面の流れを先行表示します。選曲時の試聴ではありません。",
 						"While loading, hold START or SELECT to preview chart movement on the play field. This is not Music Select audio preview.",
-						sidebarToggle(chartpreview))
+						sidebarToggle(chartpreview)),
+				sidebarSettingRow("最終ノーツ後すぐに終了", "End play at last note",
+						"最後のノーツ（LN終端を含む）の判定が確定したら、余韻を待たずにリザルトへ進みます。スコアと判定は変わりません。",
+						"Goes to the result as soon as the last note (including LN ends) is judged, without the trailing wait. Score and judgments are unchanged.",
+						sidebarToggle(endplayatlastnote))
 		);
 
 		sidebarPlayOptionGroups.getChildren().setAll(visibility, chart, assist, result);
@@ -2898,6 +3003,9 @@ public class PlayConfigurationView implements Initializable {
 
         usecim.setSelected(config.isCacheSkinImage());
         clipboardScreenshot.setSelected(config.isSetClipboardWhenScreenshot());
+        screenshotSound.setSelected(config.isScreenshotSound());
+        screenshotSoundVolume.setValue(config.getScreenshotSoundVolume());
+        replayLaneSettings.setSelected(config.isReplayLaneSettings());
 		screenshotFormat.setValue(config.getScreenshotFormat());
 
 		enableIpfs.setSelected(config.isEnableIpfs());
@@ -3023,6 +3131,7 @@ public class PlayConfigurationView implements Initializable {
 		bmsirLr2HispeedFixEnabled.setSelected(
 				player.isBmsirLr2HispeedFixEnabled()
 		);
+		bgaDisplay.setSelected(player.isBmsirBgaDisplayEnabled());
 		bmsirJudgeRankSortEnabled.setSelected(
 				player.isBmsirJudgeRankSortEnabled()
 		);
@@ -3055,6 +3164,7 @@ public class PlayConfigurationView implements Initializable {
 		seventoninetype.getSelectionModel().select(player.getSevenToNineType());
 		exitpressduration.getValueFactory().setValue(player.getExitPressDuration());
 		chartpreview.setSelected(player.isChartPreview());
+		endplayatlastnote.setSelected(player.isEndPlayAtLastNote());
 		guidese.setSelected(player.isGuideSE());
 		windowhold.setSelected(player.isWindowHold());
 		gaugeop.getSelectionModel().select(player.getGauge());
@@ -3150,6 +3260,9 @@ public class PlayConfigurationView implements Initializable {
 		config.setOverrideDownloadURL(overrideDownloadURL.getText());
 
 		config.setClipboardWhenScreenshot(clipboardScreenshot.isSelected());
+        config.setScreenshotSound(screenshotSound.isSelected());
+        config.setScreenshotSoundVolume((float)screenshotSoundVolume.getValue());
+        config.setReplayLaneSettings(replayLaneSettings.isSelected());
 		config.setScreenshotFormat(screenshotFormat.getValue());
 
 		commitPlayer();
@@ -3278,6 +3391,7 @@ public class PlayConfigurationView implements Initializable {
 		player.setSevenToNineType(seventoninetype.getValue());
 		player.setExitPressDuration(getValue(exitpressduration));
 		player.setChartPreview(chartpreview.isSelected());
+		player.setEndPlayAtLastNote(endplayatlastnote.isSelected());
 		player.setGuideSE(guidese.isSelected());
 		player.setWindowHold(windowhold.isSelected());
 		player.setGauge(gaugeop.getValue());
@@ -3360,8 +3474,10 @@ public class PlayConfigurationView implements Initializable {
 	public void updatePlayConfig() {
 		if (pc != null) {
 			PlayConfig conf = player.getPlayConfig(Mode.valueOf(pc.name())).getPlayconfig();
-			conf.setHispeed(getValue(hispeed).floatValue());
-			conf.setDuration(getValue(gvalue));
+			String mode = conf.resolveBmsirHispeedMode(player.isBmsirLr2HispeedFixEnabled());
+			if (PlayConfig.HISPEED_MODE_LR2.equals(mode)) conf.setBmsirLr2Hispeed(getValue(hispeed).floatValue());
+			else if (PlayConfig.HISPEED_MODE_NORMAL.equals(mode)) conf.setHispeed(getValue(hispeed).floatValue());
+			if (PlayConfig.HISPEED_MODE_NORMAL.equals(mode)) conf.setDuration(getValue(gvalue));
 			conf.setEnableConstant(enableConstant.isSelected());
 			conf.setConstantFadeinTime(getValue(constFadeinTime));
 			conf.setHispeedMargin(getValue(hispeedmargin).floatValue());
@@ -3386,7 +3502,7 @@ public class PlayConfigurationView implements Initializable {
 			return;
 		}
 		PlayConfig conf = player.getPlayConfig(Mode.valueOf(pc.name())).getPlayconfig();
-		hispeed.getValueFactory().setValue((double) conf.getHispeed());
+		hispeed.getValueFactory().setValue((double) (PlayConfig.HISPEED_MODE_LR2.equals(conf.resolveBmsirHispeedMode(player.isBmsirLr2HispeedFixEnabled())) ? conf.getEffectiveLr2Hispeed() : conf.getHispeed()));
 		gvalue.getValueFactory().setValue(conf.getDuration());
 		enableConstant.setSelected(conf.isEnableConstant());
 		constFadeinTime.getValueFactory().setValue(conf.getConstantFadeinTime());
@@ -3414,15 +3530,25 @@ public class PlayConfigurationView implements Initializable {
 		if (player == null || bmsirHispeedPc == null) {
 			return;
 		}
+		updatingHispeedUi = true;
+		playconfig.setValue(bmsirHispeedPc);
 		PlayConfig conf = player.getPlayConfig(
 				Mode.valueOf(bmsirHispeedPc.name())
 		).getPlayconfig();
+		if (conf.getBmsirLr2Hispeed() == null) conf.setBmsirLr2Hispeed(conf.getHispeed());
 		bmsirBaseScrollSpeed.getValueFactory().setValue(
 				conf.getBmsirBaseScrollSpeed()
 		);
 		bmsirHispeedReferenceBpm.getValueFactory().setValue(
 				conf.getBmsirHispeedReferenceBpm()
 		);
+		bmsirFloatingHispeedEnabled.setSelected(conf.isBmsirFloatingHispeedEnabled());
+		bmsirFloatingHispeed.getValueFactory().setValue((double) conf.getBmsirFloatingHispeed());
+		bmsirFloatingGreen.getValueFactory().setValue(bms.player.beatoraja.play.BMSIRFloatingHispeed.greenNumber(conf.getBmsirFloatingGreenFrames()));
+		hispeedKind.getSelectionModel().select(bms.player.beatoraja.arena.bmsir.BMSIRArenaOverlay.hispeedModeIndex(conf.resolveBmsirHispeedMode(player.isBmsirLr2HispeedFixEnabled())));
+		hispeedGreenNumber.getValueFactory().setValue(Math.max(1, conf.getDuration() * 3 / 5));
+		updatingHispeedUi = false;
+		refreshHispeedVisibility();
 	}
 
 	private void commitBmsirHispeedMode() {
@@ -3436,6 +3562,17 @@ public class PlayConfigurationView implements Initializable {
 		).getPlayconfig();
 		conf.setBmsirBaseScrollSpeed(getValue(bmsirBaseScrollSpeed));
 		conf.setBmsirHispeedReferenceBpm(getValue(bmsirHispeedReferenceBpm));
+		conf.setBmsirFloatingHispeedEnabled(bmsirFloatingHispeedEnabled.isSelected());
+		conf.setBmsirHispeedMode(speedModeForIndex(hispeedKind.getSelectionModel().getSelectedIndex()));
+		if (pc == bmsirHispeedPc && PlayConfig.HISPEED_MODE_NORMAL.equals(conf.getBmsirHispeedMode())
+				&& conf.getFixhispeed() != PlayConfig.FIX_HISPEED_OFF) {
+			int duration = normalDurationForGreen(conf.getDuration(), getValue(hispeedGreenNumber));
+			conf.setDuration(duration); gvalue.getValueFactory().setValue(duration);
+		}
+		int green = getValue(bmsirFloatingGreen);
+		if (green != bms.player.beatoraja.play.BMSIRFloatingHispeed.greenNumber(conf.getBmsirFloatingGreenFrames())) {
+			conf.setBmsirFloatingGreenFrames(green / 10f);
+		}
 		conf.validate();
 	}
 

@@ -30,6 +30,7 @@ public class SkinGauge extends SkinObject {
 	 * アニメーションの種類
 	 */
 	private int animationType = ANIMATION_RANDOM;
+    private final Color originalColor = new Color();
 	/**
 	 * アニメーションの種類:ランダム
 	 */	
@@ -207,14 +208,15 @@ public class SkinGauge extends SkinObject {
 						region.x + region.width * (i - 1) / parts, region.y, region.width / parts, region.height);
 
 				if(i == notes) {
-					final Color orgColor = sprite.getColor();
+					final Color orgColor = originalColor.set(sprite.getColor());
 					flickerColor.set(orgColor.r, orgColor.g, orgColor.b, orgColor.a * (animation < duration / 2 ? animation / ((float) duration / 2 - 1) : ((duration - 1) - animation) / ((float) duration / 2 - 1)));
-					sprite.setColor(flickerColor);
+					try {
+						sprite.setColor(flickerColor);
 //					System.out.println(animation + "  " + duration + "  " + flickerColor.toString());
 					sprite.draw(
 							images[exgauge + 4 + (border < this.border ? 1 : 0)],
 							region.x + region.width * (i - 1) / parts, region.y, region.width / parts, region.height);
-					sprite.setColor(orgColor);
+					} finally { sprite.setColor(orgColor); }
 				}
 			}		
 			break;

@@ -1,5 +1,9 @@
 # BMS-IR Arena client
 
+鍵盤モード別の[フローティングハイスピード](../docs/FLOATING_HISPEED.md)を追加しました。
+設定画面と通常・コンパクトのオーバーレイから有効にできます。保存緑数字、カバー操作、
+リプレイ対応はリンク先に記載しています。初期状態はOFFです。
+
 Status: BMS-IR Arena v1 release branch. This source prepares the unified
 `Arena oraja 0.4.14.58`. It replaces the separate Endless Dream and
 beatoraja Arena bodies and lets one installation select LR2 or oraja
@@ -10,30 +14,17 @@ for LN/CN/HCN. Casual/private rooms use the selected mode; rated Arena remains
 LN-only. No release channel or existing v7 artifact changes until a separate
 reviewed build and rollout.
 
-The current development source adds an opt-in LR2-style fixed-HI-SPEED path to
-the BMS-IR settings. One global switch controls the override. The 5-key, 7-key,
-10-key, 14-key, 9-key, 24-key, and 24-key double modes retain independent base
-scroll and reference-BPM values. Base 100 is 1.00x; reference BPM defaults to
-150 and is adjustable from 50 through 400 in steps of 1. The existing
-OFF/START/MAX/MAIN/MIN HI-SPEED FIX choice selects the chart BPM target.
+The dedicated HI-SPEED tab selects Normal, LR2, or Floating independently
+for each key mode. Startup settings and the F5 Mod Menu's own HI-SPEED
+window (no longer a Play Settings tab) share the selection; the Arena overlays no longer show a HI-SPEED editor. Live switching preserves each speed
+mode's values, the chart position, and replay events. NO SPEED constraints
+and replay lane restoration lock the speed controls. BGA display can be
+toggled independently while its playback clock continues.
 
-The BMS-IR settings page has an independent mode selector for these values.
-During Music Select, both the full and compact Arena overlays expose the
-override ON/OFF switch plus base-scroll and reference-BPM controls. The
-overlay editor follows the selected chart mode by default or can be pinned to
-5KEY, 7KEY, 9KEY/PMS, 10KEY DP, 14KEY DP, 24KEY, or 24KEY DP. A labeled
-numeric field edits the normal per-mode HI-SPEED change margin from 0.00
-through 10.00. A separate numeric field directly edits the selected mode's
-HI-SPEED from 0.01 through 20.00 and updates a matching live lane immediately.
-The launcher names the existing `Long Note Modify Mode` as
-`強制LN／ロングノート変換` in Japanese, while preserving its OFF, REMOVE, and
-ADD LN/CN/HCN/ALL behavior, so the option remains visible in both the classic
-and searchable sidebar layouts. The dedicated equivalent-green editor/readout
-and pseudo FHS are not provided; START+SELECT therefore keeps the ordinary
-play behavior. NO
-SPEED courses ignore the override, and replay data stores whether the original
-play used it. Existing configs default the switch off, the editor to follow
-the current chart, base scroll to 100, and reference BPM to 150.
+Legacy global LR2 and per-mode floating settings migrate without changing
+the selected behavior. The new explicit per-mode selection is authoritative.
+The sidecar retains the independent speed values, fixed-BPM selection,
+and BGA display preference when an older body rewrites config_player.json.
 
 Version `0.4.14.58` replaces the untraceable legacy Windows PortAudio and
 JPortAudio binaries with a clean x86-64 build from pinned PortAudio 19.7.0 and
@@ -222,6 +213,14 @@ player's table cannot be targeted and a concurrent Web/client edit reloads the
 authoritative selected table instead of being overwritten. Child-table levels
 managed by a cross-game master are shown read-only and continue to come from
 the master.
+
+The table editor is no longer an Arena overlay tab: open it from the F5 Mod
+Menu's `難易度表編集` / `Table Editor` window (filterable like other Mod Menu
+items). The music-select Arena overlay tabs are ordered Battle, Lobby / Rooms,
+Rating, Profiles, Settings, Manual. HI-SPEED is edited only in the F5 HI-SPEED
+window, and `BGAを表示` lives with the display toggles in Settings
+and the F5 Display window.
+
 Version `0.4.14.37` lets an existing table hold metadata and up to 64
 selected-chart add/update/remove changes as an in-memory draft. The overlay
 shows the pending count and
@@ -1321,6 +1320,12 @@ ordinary system-sound volume multiplied by the Arena notification volume.
 
 ## Ordinary-play and skin additions
 
+- Integer-only gauge skins during play and on song/course results display at least
+  `1%` whenever the actual remainder is positive. This also covers NANTOKA
+  MANIA's positive remainder below its first 2% display step. Actual zero stays
+  `0%`. Skins declaring the separate gauge decimal digit keep their existing
+  integer and decimal values, as do nonzero display steps. Gauge arithmetic,
+  death/qualification, history, replays, and IR values retain the actual remainder.
 - The native game window title stays exactly `Arena oraja` across client
   versions so OBS window-capture rules remain stable. Configuration, What's
   New, startup, and other version-identification surfaces keep the versioned
@@ -1524,6 +1529,22 @@ platform build.
   `play_scratch_fast(side)`, or `play_scratch_slow(side)`. Side is `1` or
   `2`; direction flags use the most recent 500 ms. An optional second
   duration argument is clamped to 50--2000 ms.
+
+## SELECT retry and HIDDEN controls
+
+START+SELECT exit input and SELECT quick retry do not count toward HIDDEN's
+double press. Closing states (including abort before the first judgment or
+during loading) stop lane-setting adjustments, and a SELECT held into the next
+play must be released before it can arm a fresh double press. During loading,
+READY, and play, two fresh SELECT-only presses less than 500 ms apart still
+toggle HIDDEN. SELECT+keys/scratch green-number adjustments remain available.
+No saved HIDDEN setting or configuration format is changed.
+
+日本語: 終了のSTART＋SELECTとリトライのSELECTをHIDDENの連打判定に含めません。
+終了後のカバー等の調整は停止し、次のプレイまで押し続けたSELECTは一度離してから
+連打判定を開始します。通常のSELECT単独2回押しと緑数字調整は従来どおりです。
+実機では、ロード中／最初の判定前／判定後の終了からSELECTリトライを行い、
+HIDDENが変わらないことと、通常の2回押しでON/OFFできることを確認してください。
 
 ## CONSTANT and scroll modification
 

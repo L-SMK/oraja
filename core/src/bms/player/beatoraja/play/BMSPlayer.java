@@ -69,6 +69,11 @@ public class BMSPlayer extends MainState {
 	private int courseGaugeInitialValue;
 
 	private int playtime;
+	/** Set when the play finished at the last judged note instead of waiting out the after-note margin. */
+	private boolean endedAtLastNote;
+	private int expectedJudgedNotes = -1;
+	/** Play time when every note was first seen judged, or {@link Long#MIN_VALUE} while notes remain. */
+	private long allNotesJudgedAt = Long.MIN_VALUE;
 
 	/**
 	 * キー入力用スレッド
@@ -94,8 +99,20 @@ public class BMSPlayer extends MainState {
 	 * リプレイHS保存用 STATE READY時に保存
 	 */
 	private PlayConfig replayConfig;
+    private ReplayLaneTimeline laneTimeline;
+    private bms.player.beatoraja.ReplayLaneState replayLaneInitial;
+
+    public boolean restoresReplayLaneSettings() {
+        return resource.getPlayMode().mode == BMSPlayerMode.Mode.REPLAY
+                && bms.player.beatoraja.ReplayLaneState.canRestore(replay,
+                        resource.getConfig().isReplayLaneSettings(), resource.getConstraint());
+    }
 
 	static final int TIME_MARGIN = 5000;
+	/** Frames after the last judgment so gauge, gauge auto shift and failure checks settle before finishing. */
+	static final int END_AT_LAST_NOTE_SETTLE = 100;
+	/** Wait past the last chart object (mines included) so a late mine still damages the gauge. */
+	static final int END_AT_LAST_NOTE_OBJECT_MARGIN = 500;
 	private static final long LOUDNESS_ANALYSIS_TIMEOUT_NANOS = TimeUnit.SECONDS.toNanos(15);
 
 	private int state = STATE_PRELOAD;
@@ -121,6 +138,7 @@ public class BMSPlayer extends MainState {
 	private boolean allReady = false;
 
 	private float adjustedVolume = -1.f;
+    private volatile BMSLoudnessAnalyzer.AnalysisResult normalizationResult;
 	private boolean analysisChecked = false;
 	private Future<BMSLoudnessAnalyzer.AnalysisResult> analysisTask;
 	private long analysisWaitStartedNanos;
@@ -130,6 +148,8 @@ public class BMSPlayer extends MainState {
 	private boolean bgaPreparationComplete;
 	private boolean countdownStageReported;
 	private boolean playEndMetricsSent;
+	/** Latched while playing so a mid-play switch to floating hi-speed still marks the IR score. */
+	private boolean floatingHispeedUsed;
 	private long diagnosticPlaySessionId;
 
 	public BMSPlayer(MainController main, PlayerResource resource) {
@@ -158,6 +178,7 @@ public class BMSPlayer extends MainState {
 		PlayerConfig config = resource.getPlayerConfig();
 		resource.setFailMeasure(Double.NaN);
 		playEndMetricsSent = false;
+		floatingHispeedUsed = false;
 		BMSIRManiacPlayContext maniacContext = null;
 
 		playinfo.randomoption = config.getRandom();
@@ -319,7 +340,10 @@ public class BMSPlayer extends MainState {
 			// legacy authored CN/HCN and the recorded #RANDOM branch.
 			BMSModel recordedModel = resource.loadBMSModelForReplay(replay);
 			if (recordedModel == null) throw new IllegalStateException("Cannot decode replay chart");
+            boolean changedInterpretation = "1".equals(model.getValues().get(BMSDecoder.COMPATIBILITY_AFFECTED))
+                    || "1".equals(recordedModel.getValues().get(BMSDecoder.COMPATIBILITY_AFFECTED));
 			model = recordedModel;
+            if (changedInterpretation) resource.installRecordedReplayModel(recordedModel);
 		}
 		// 通常プレイの場合は最後のノーツ、オートプレイの場合はBG/BGAを含めた最後のノーツ
 		playtime = (autoplay.mode == BMSPlayerMode.Mode.AUTOPLAY ? model.getLastTime() : model.getLastNoteTime()) + TIME_MARGIN;
@@ -897,6 +921,14 @@ public class BMSPlayer extends MainState {
 			input.setEnable(false);
 		}
 		lanerender = new LaneRenderer(this, model);
+        if (restoresReplayLaneSettings()) {
+            replayLaneInitial = bms.player.beatoraja.ReplayLaneState.capture(0, replay.config,
+                    replay.config.getBmsirLr2HispeedFixReplayEnabled() != null
+                            ? replay.config.getBmsirLr2HispeedFixReplayEnabled()
+                            : config.isBmsirLr2HispeedFixEnabled());
+            laneTimeline = new ReplayLaneTimeline(replayLaneInitial, replay.laneStates);
+            lanerender.applyReplayLaneState(replayLaneInitial);
+        }
 		BMSIRArenaClient.tracePlayPhase("lane_renderer_ready", this);
 		for (CourseData.CourseDataConstraint i : resource.getConstraint()) {
 			if (i == NO_SPEED) {
@@ -967,6 +999,7 @@ public class BMSPlayer extends MainState {
 		final PlayerConfig config = resource.getPlayerConfig();
 
 		final long micronow = timer.getNowMicroTime();
+
 
 		if(micronow > skin.getInput() * 1000){
 			timer.switchTimer(TIMER_STARTINPUT, true);
@@ -1131,7 +1164,11 @@ public class BMSPlayer extends MainState {
 				}
 				if (timer.getNowTime(TIMER_READY) > skin.getPlaystart()
 						&& BMSIRArenaClient.isArenaStartReleased()) {
+                    if (restoresReplayLaneSettings()) lanerender.applyReplayLaneState(replayLaneInitial);
 					replayConfig = lanerender.getPlayConfig().clone();
+                    if (!restoresReplayLaneSettings()) {
+                        laneTimeline = new ReplayLaneTimeline(lanerender.captureReplayLaneState(0), null);
+                    }
 					saveConfig();
 					state = STATE_PLAY;
 					TimingDiagnostics.playStageChanged("ACTIVE_PLAY");
@@ -1167,7 +1204,20 @@ public class BMSPlayer extends MainState {
 				skin.pomyu.updateTimer(this);
 
 				// System.out.println("playing time : " + time);
-				if (playtime < ptime) {
+				boolean endAtLastNote = false;
+				if (config.isEndPlayAtLastNote()
+						&& allNotesJudged(true, autoplay.mode, judge.getPastNotes(), expectedJudgedNotes())) {
+					if (allNotesJudgedAt == Long.MIN_VALUE) {
+						allNotesJudgedAt = ptime;
+					}
+					endAtLastNote = endAtLastNoteSettled(ptime, allNotesJudgedAt, model.getLastNoteTime());
+				}
+				if (playtime < ptime || endAtLastNote) {
+					if (endAtLastNote && playtime >= ptime) {
+						endedAtLastNote = true;
+						timer.switchTimer(TIMER_ENDOFNOTE_1P, true);
+						logger.info("最終ノーツ処理済みのため余韻を待たずに終了");
+					}
 					state = STATE_FINISHED;
 					timer.setTimerOn(TIMER_MUSIC_END);
 					for(int i = TIMER_PM_CHARA_1P_NEUTRAL; i <= TIMER_PM_CHARA_2P_BAD; i++) {
@@ -1290,7 +1340,7 @@ public class BMSPlayer extends MainState {
                 control.setEnableCursor(false);
                 keyinput.stopJudge();
 				keysound.stopBGPlay();
-				if (timer.getNowTime(TIMER_MUSIC_END) > skin.getFinishMargin()) {
+				if (endedAtLastNote || timer.getNowTime(TIMER_MUSIC_END) > skin.getFinishMargin()) {
 					timer.switchTimer(TIMER_FADEOUT, true);
 				}
 				if (timer.getNowTime(TIMER_FADEOUT) > skin.getFadeout()) {
@@ -1355,7 +1405,47 @@ public class BMSPlayer extends MainState {
 			}
 		}
 
+		if (state == STATE_PLAY && lanerender.isFloatingHispeedEnabled()) {
+			floatingHispeedUsed = true;
+		}
+        if (restoresReplayLaneSettings() && laneTimeline != null) {
+            lanerender.applyReplayLaneState(timer.isTimerOn(TIMER_PLAY)
+                    ? laneTimeline.at(Math.max(0, timer.getNowMicroTime(TIMER_PLAY))) : replayLaneInitial);
+        } else if (state == STATE_PLAY && laneTimeline != null) {
+            laneTimeline.record(lanerender.captureReplayLaneState(timer.getNowMicroTime(TIMER_PLAY)));
+        }
 		prevtime = micronow;
+	}
+
+	/**
+	 * Whether every note (including LN ends) has been judged, so the option may end the play.
+	 * Only PLAY and REPLAY honor the option; AUTOPLAY and PRACTICE keep their normal end timing.
+	 */
+	static boolean allNotesJudged(boolean enabled, BMSPlayerMode.Mode mode, int pastNotes, int expectedNotes) {
+		return enabled
+				&& (mode == BMSPlayerMode.Mode.PLAY || mode == BMSPlayerMode.Mode.REPLAY)
+				&& expectedNotes > 0
+				&& pastNotes >= expectedNotes;
+	}
+
+	/**
+	 * Whether the play may finish after all notes were judged at {@code allJudgedAt}: the judge thread
+	 * updates the gauge after the note count, so wait a short settle time, and never before the last
+	 * chart object (mines included) is past.
+	 */
+	static boolean endAtLastNoteSettled(long ptime, long allJudgedAt, long lastNoteTime) {
+		return allJudgedAt != Long.MIN_VALUE
+				&& ptime - allJudgedAt >= END_AT_LAST_NOTE_SETTLE
+				&& ptime >= lastNoteTime + END_AT_LAST_NOTE_OBJECT_MARGIN;
+	}
+
+	/** The judged-note count that means the chart is done; the larger count is used so the end is never early. */
+	private int expectedJudgedNotes() {
+		if (expectedJudgedNotes < 0) {
+			int songNotes = resource.getSongdata() != null ? resource.getSongdata().getNotes() : 0;
+			expectedJudgedNotes = Math.max(songNotes, NantokaManiaRules.totalNotes(model));
+		}
+		return expectedJudgedNotes;
 	}
 
 	private void sendPlayEndMetrics(boolean quickRetry) {
@@ -1406,8 +1496,14 @@ public class BMSPlayer extends MainState {
 		return state;
 	}
 
+    public float getAdjustedBackgroundVolume() {
+        return normalizedVolume(main.getConfig().getAudioConfig().getBgvolume());
+    }
+    private float normalizedVolume(float configured) {
+        return normalizationResult != null ? normalizationResult.calculateAdjustedVolume(configured) : -1f;
+    }
 	public float getAdjustedVolume() {
-		return adjustedVolume;
+        return normalizedVolume(main.getConfig().getAudioConfig().getKeyvolume());
 	}
 
 	private boolean pollLoudnessAnalysis() {
@@ -1443,8 +1539,8 @@ public class BMSPlayer extends MainState {
 		try {
 			BMSLoudnessAnalyzer.AnalysisResult result = analysisTask.get();
 			if (result.success) {
-				float configVolume = main.getConfig().getAudioConfig().getKeyvolume();
-				adjustedVolume = result.calculateAdjustedVolume(configVolume);
+                normalizationResult = result;
+                adjustedVolume = result.calculateAdjustedVolume(main.getConfig().getAudioConfig().getKeyvolume());
 				logger.info("Volume set to {} ({} LUFS)", adjustedVolume, result.loudnessLUFS);
 			} else {
 				logger.warn("Analysis failed: {}", result.errorMessage);
@@ -1494,11 +1590,16 @@ public class BMSPlayer extends MainState {
 		return lanerender;
 	}
 
+	public void resetLaneControlInput() {
+		if (control != null) control.resetAfterHispeedModeChange();
+	}
+
 	public LaneProperty getLaneProperty() {
 		return laneProperty;
 	}
 
 	private void saveConfig() {
+        if (resource.getPlayMode().mode == BMSPlayerMode.Mode.REPLAY) return;
 		for (CourseData.CourseDataConstraint c : resource.getConstraint()) {
 			if (c == NO_SPEED) {
 				return;
@@ -1521,14 +1622,19 @@ public class BMSPlayer extends MainState {
 			PlayConfig live,
 			boolean bmsirLr2HispeedFixEnabled
 	) {
+		target.setBmsirFloatingHispeed(live.getBmsirFloatingHispeed());
+		target.setBmsirFloatingGreenFrames(live.getBmsirFloatingGreenFrames());
+		target.setBmsirHispeedMode(live.getBmsirHispeedMode());
+		target.setBmsirLr2Hispeed(live.getBmsirLr2Hispeed());
+		target.setFixhispeed(live.getFixhispeed());
 		if (bmsirLr2HispeedFixEnabled) {
-			target.setHispeed(live.getHispeed());
+			if (live.getBmsirLr2Hispeed() == null) target.setHispeed(live.getHispeed());
 			target.setDuration(live.getDuration());
 			target.setBmsirBaseScrollSpeed(live.getBmsirBaseScrollSpeed());
 			target.setBmsirHispeedReferenceBpm(
 					live.getBmsirHispeedReferenceBpm()
 			);
-		} else if (target.getFixhispeed() != PlayConfig.FIX_HISPEED_OFF) {
+		} else if (live.getFixhispeed() != PlayConfig.FIX_HISPEED_OFF) {
 			target.setDuration(live.getDuration());
 		} else {
 			target.setHispeed(live.getHispeed());
@@ -1571,6 +1677,7 @@ public class BMSPlayer extends MainState {
 				? (playinfo.randomoption2 * 10 + playinfo.doubleoption * 100) : 0));
 		score.setSeed((model.getMode().player == 2 ? playinfo.randomoption2seed * 65536 * 256 : 0) + playinfo.randomoptionseed);
 		score.encodeGhost(judge.getGhost());
+		score.setBmsirFloatingHispeedUsed(floatingHispeedUsed);
 		// リプレイデータ保存。スコア保存されない場合はリプレイ保存しない
 		final ReplayData replay = resource.getReplayData();
 		replay.player = main.getPlayerConfig().getName();
@@ -1605,6 +1712,9 @@ public class BMSPlayer extends MainState {
 			replay.bmsirManiacPlacementHash = maniacContext.placementHash();
 		}
 		replay.config = replayConfig;
+        replay.bmsirParserRevision = BMSIRParserCompatibility.CURRENT_REVISION;
+        replay.laneStateVersion = 1;
+        replay.laneStates = laneTimeline == null ? new bms.player.beatoraja.ReplayLaneState[0] : laneTimeline.recorded();
 
 		score.setPassnotes(judge.getPastNotes());
 		score.setMinbp(score.getEbd() + score.getLbd() + score.getEpr() + score.getLpr() + score.getEms() + score.getLms() + resource.getSongdata().getNotes() - judge.getPastNotes());

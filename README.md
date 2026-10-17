@@ -1,5 +1,8 @@
 # BMS-IR Arena oraja
 
+鍵盤モード別に選択できる[フローティングハイスピード](docs/FLOATING_HISPEED.md)を追加しました。
+倍率0.50～10.00、START＋鍵盤で±0.50、カバー操作時は保存緑数字へ戻ります。初期状態はOFFです。
+
 BMS-IR向けの専用LR2oraja Endless Dreamクライアントです。通常プレイに加え、
 BMS-IR Arena、BMS-IR固有設定、専用ランチャーなどを収録しています。
 
@@ -26,6 +29,19 @@ missed starts, normal end release, and autoplay; physical visual acceptance is
 still an operator check.
 
 ## Current Version
+
+上流監査で残ったIR設定保持、音量正規化、ゲージ/トレーナー表示、BGA/旧BMS互換の
+9件を修正しました。解析が変わる可能性のある譜面は旧成績と新成績のローカル保存を分け、
+旧リプレイは記録時の解析で再生します。公開譜面ハッシュは保持します。
+更新後の楽曲DB刷新、保存/リプレイ/IRの互換性と実機確認は
+[上流不具合修正の説明](docs/UPSTREAM_BUGFIXES_2026-10-13.md)を参照してください。
+ソース実装のみで、配布は別工程です。
+
+開発ソースに、任意のスクショ保存音、リプレイの開始表示設定・曲中HS/カバー操作の再現、
+キー数別の複数入力割当を追加しました。複数入力は最後の入力を離すまで押下を保持します。
+旧リプレイと既存設定を維持し、リプレイの表示設定を普段の設定へ書き戻しません。
+操作と互換性、実機確認項目は [スクショ・リプレイ・複数入力](docs/SCREENSHOT_REPLAY_BINDINGS.md)
+を参照してください。ソース変更のみで、配布は別工程です。
 
 手元カメラ入力をJSON/Luaスキンの `camera` 部品で表示できます（source実装、初期OFF）。
 位置・サイズ・切り抜き・表示条件をスキンで管理します。
@@ -70,22 +86,12 @@ MAX values, and replays preserve their recorded interpretation.
 See [the compatibility and validation guide](docs/FORCED_LONG_NOTE_MODE.md).
 This source change does not publish a new body or plugin package.
 
-The BMS-IR settings also provide a default-off LR2-style fixed-HI-SPEED
-override. Each play mode keeps an independent base scroll value, where 100 is
-1.00x, and a reference BPM adjustable from 50 through 400 with a default of
-150. The selected legacy OFF/START/MAX/MAIN/MIN HI-SPEED FIX target supplies
-the chart BPM used by the calculation. The BMS-IR settings page can switch the
-mode being edited, and the full and compact Arena overlays can toggle the
-override and edit the current mode's base and reference values during Music
-Select. The overlays now also provide an AUTO/current-chart or explicit-mode
-editor selector and a numeric per-mode HI-SPEED change-step field from 0.00
-through 10.00. A separate numeric field edits the selected mode's actual
-HI-SPEED value from 0.01 through 20.00 and applies it to the live lane when a
-matching play is active. Both overlays also expose the global START+6/7
-lane-cover step as a labeled integer from 1 through 1000; it remains separate
-from the per-mode HI-SPEED change step. The override is disabled for NO SPEED
-constraints and is snapshotted into replays. It does not add a pseudo-FHS
-chord or an equivalent-green editor.
+The dedicated HI-SPEED tab selects Normal, LR2, or Floating independently
+for each key mode. Startup settings, the Arena overlay, and the F5 Play
+Settings window share the selection. Live switching preserves each speed
+mode's values, the chart position, and replay events. NO SPEED constraints
+and replay lane restoration lock the speed controls. BGA display can be
+toggled independently while its playback clock continues.
 
 The launcher Skin settings provide a default-on switch for the live Skin
 Select preview. Turning it off skips preview construction, reload, and render

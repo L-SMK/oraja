@@ -129,6 +129,8 @@ public class ScoreData implements Validatable {
 	private int bmsirLongNotePolicy;
 	/** Live play interpretation; -1 means an older stored record has no evidence. */
 	private int bmsirEffectiveLnType = -1;
+	/** Live-play IR display marker: floating hi-speed was active at least once. Not stored locally. */
+	private boolean bmsirFloatingHispeedUsed;
 	
 	private String scorehash = "";
 	/**
@@ -337,6 +339,14 @@ public class ScoreData implements Validatable {
 
 	public void setBmsirLongNotePolicy(int policy) {
 		bmsirLongNotePolicy = policy;
+	}
+
+	public boolean isBmsirFloatingHispeedUsed() {
+		return bmsirFloatingHispeedUsed;
+	}
+
+	public void setBmsirFloatingHispeedUsed(boolean used) {
+		bmsirFloatingHispeedUsed = used;
 	}
 	public void setMode(int mode) {
 		this.mode = mode;

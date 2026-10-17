@@ -80,7 +80,7 @@ public class KeySoundProcessor {
 
 			while (!stop) {
 				final long time = player.timer.getNowMicroTime(TIMER_PLAY);
-				float volume = player.getAdjustedVolume();
+				float volume = player.getAdjustedBackgroundVolume();
 				if (volume < 0) {
 					volume = config.getAudioConfig().getBgvolume();
 				}

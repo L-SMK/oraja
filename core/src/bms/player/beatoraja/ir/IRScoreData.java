@@ -14,7 +14,7 @@ import bms.player.beatoraja.play.JudgeAlgorithm;
 public class IRScoreData {
 
 	/**
-	 * 譜面のハッシュ値
+	 * ローカル成績の識別キー。公開譜面の識別はIRChartDataを使用する。
 	 */
 	public final String sha256;
 	/**
@@ -26,6 +26,8 @@ public class IRScoreData {
 	public final int bmsirEffectiveLnType;
 	/** Local score interpretation revision, optional for compatible IR plugins. */
 	public final int bmsirLongNotePolicy;
+	/** True when floating hi-speed was active during this live play; optional for compatible IR plugins. */
+	public final boolean bmsirFloatingHispeedUsed;
 	/**
 	 * プレイヤー名。自身のスコアの場合は空白
 	 */
@@ -124,6 +126,7 @@ public class IRScoreData {
 		this.lntype = score.getBmsirEffectiveLnType() >= 0
 				? score.getBmsirEffectiveLnType() : score.getMode();
 		this.bmsirLongNotePolicy = score.getBmsirLongNotePolicy();
+		this.bmsirFloatingHispeedUsed = score.isBmsirFloatingHispeedUsed();
 		this.player = score.getPlayer();
 		this.clear = ClearType.getClearTypeByID(score.getClear());
 		this.date = score.getDate();
@@ -167,6 +170,7 @@ public class IRScoreData {
 		this.bmsirScoreMode = lntype;
 		this.bmsirEffectiveLnType = lntype;
 		this.bmsirLongNotePolicy = bmsirLongNotePolicy;
+		this.bmsirFloatingHispeedUsed = false;
 		this.player = player;
 		this.clear = clear;
 		this.date = date;
@@ -207,6 +211,7 @@ public class IRScoreData {
 		score.setMode(this.lntype);
 		score.setBmsirEffectiveLnType(this.lntype);
 		score.setBmsirLongNotePolicy(this.bmsirLongNotePolicy);
+		score.setBmsirFloatingHispeedUsed(this.bmsirFloatingHispeedUsed);
 		score.setPlayer(this.player);
 		score.setClear(this.clear.id);
 		score.setDate(this.date);

@@ -547,6 +547,7 @@ public class MusicResult extends AbstractResult {
 			}
 			cscore.setPassnotes(cscore.getPassnotes() + newscore.getPassnotes());
 			cscore.setBmsirEffectiveLnType(Math.max(cscore.getBmsirEffectiveLnType(), newscore.getBmsirEffectiveLnType()));
+			if (newscore.isBmsirFloatingHispeedUsed()) cscore.setBmsirFloatingHispeedUsed(true);
 			cscore.setEpg(cscore.getEpg() + newscore.getEpg());
 			cscore.setLpg(cscore.getLpg() + newscore.getLpg());
 			cscore.setEgr(cscore.getEgr() + newscore.getEgr());

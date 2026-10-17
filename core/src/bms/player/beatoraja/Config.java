@@ -236,6 +236,9 @@ public class Config implements Validatable {
 
 	private boolean useDiscordRPC = false;
 	private boolean setClipboardScreenshot = false;
+    private boolean screenshotSound = false;
+    private float screenshotSoundVolume = 0.5f;
+    private boolean replayLaneSettings = true;
 
 	public enum ScreenShotFormat {
 		PNG, JPG
@@ -723,6 +726,15 @@ public class Config implements Validatable {
 	public void setClipboardWhenScreenshot(boolean setClipboardScreenshot) {
 		this.setClipboardScreenshot = setClipboardScreenshot;
 	}
+
+    public boolean isScreenshotSound() { return screenshotSound; }
+    public void setScreenshotSound(boolean enabled) { screenshotSound = enabled; }
+    public float getScreenshotSoundVolume() {
+        return Float.isFinite(screenshotSoundVolume) ? Math.max(0, Math.min(1, screenshotSoundVolume)) : 0.5f;
+    }
+    public void setScreenshotSoundVolume(float volume) { screenshotSoundVolume = volume; }
+    public boolean isReplayLaneSettings() { return replayLaneSettings; }
+    public void setReplayLaneSettings(boolean enabled) { replayLaneSettings = enabled; }
 
 	public ScreenShotFormat getScreenshotFormat() {
 		return screenshotFormat != null ? screenshotFormat : ScreenShotFormat.PNG;

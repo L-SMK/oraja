@@ -3,6 +3,12 @@
 Source implementation: Issue #485。paired plugin: BMS-Mania/bms-ir-plugin#65。
 paired server: BMS-Mania/IR#1416。配布・本番反映は別作業。
 
+2026-10-17: server側はIR#1436の固定本番 `87d64e83` に反映済み。
+本体PR #486とplugin PR #66のマージは、運営者指示により2026年11月以降へ延期する。
+main `a4e3c680` を取り込み、FHS使用情報と実LN種別の両方を保持する。
+ローカル検証・buildと、hosted CI・配布・operator実機受入を区別して記録する。
+未マージ・未配布の本体を現行test配布へ置き換えたり、既存成績を推測移行したりしない。
+
 `ScoreData.mode` は既存の保存キーの意味を維持する。今回のプレイの実効種別は
 `bmsirEffectiveLnType`（0=LN、1=CN、2=HCN）へ別に記録し、IRScoreData.lntypeへ渡す。
 混在譜面は実際に含む種別の最大値で区分する。未定義ノートは選択mode、明示ノートは

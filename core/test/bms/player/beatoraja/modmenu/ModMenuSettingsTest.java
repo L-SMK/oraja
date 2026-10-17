@@ -24,7 +24,7 @@ class ModMenuSettingsTest {
             PlayerConfig player = new Json().fromJson(PlayerConfig.class, json);
             player.validate();
             var settings = player.getModMenuSettings();
-            assertEquals(14, settings.itemEnabled.size());
+            assertEquals(16, settings.itemEnabled.size());
             for (ModMenuItem item : ModMenuItem.values()) {
                 assertEquals(item != ModMenuItem.SONG_MANAGER || !json.contains("false"), settings.isEnabled(item));
             }
@@ -54,6 +54,31 @@ class ModMenuSettingsTest {
         }
         loaded.filterEnabled = true;
         for (ModMenuItem item : ModMenuItem.values()) assertFalse(loaded.isEnabled(item));
+    }
+
+    @Test
+    void splitSettingsWindowsInheritTheFormerMiscSettingsChoice() {
+        for (boolean miscEnabled : new boolean[] {true, false}) {
+            PlayerConfig player = new Json().fromJson(PlayerConfig.class,
+                    "{\"modMenuSettings\":{\"itemEnabled\":{\"misc_settings\":" + miscEnabled
+                            + ",\"legacy_arena_menu\":false}}}");
+            player.validate();
+            var settings = player.getModMenuSettings();
+            for (ModMenuItem item : new ModMenuItem[] {
+                    ModMenuItem.PLAY_SETTINGS, ModMenuItem.HISPEED_SETTINGS,
+                    ModMenuItem.SOUND_SETTINGS, ModMenuItem.DISPLAY_SETTINGS}) {
+                assertEquals(miscEnabled, settings.isEnabled(item), item.id);
+            }
+            assertTrue(settings.isEnabled(ModMenuItem.SONG_MANAGER));
+            // Retired ids stay in the file so an older client reading it keeps the user's choice.
+            assertEquals(Boolean.valueOf(miscEnabled), settings.itemEnabled.get("misc_settings"));
+            assertEquals(Boolean.FALSE, settings.itemEnabled.get("legacy_arena_menu"));
+        }
+        PlayerConfig explicit = new Json().fromJson(PlayerConfig.class,
+                "{\"modMenuSettings\":{\"itemEnabled\":{\"misc_settings\":false,\"sound_settings\":true}}}");
+        explicit.validate();
+        assertTrue(explicit.getModMenuSettings().isEnabled(ModMenuItem.SOUND_SETTINGS));
+        assertFalse(explicit.getModMenuSettings().isEnabled(ModMenuItem.PLAY_SETTINGS));
     }
 
     @Test

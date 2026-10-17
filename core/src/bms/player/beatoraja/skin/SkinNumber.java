@@ -53,6 +53,10 @@ public final class SkinNumber extends SkinObject {
 
 	private float shift;
 
+	public boolean usesIntegerProperty(int id) {
+		return ref == IntegerPropertyFactory.getIntegerProperty(id);
+	}
+
 	public SkinNumber(TextureRegion[][] image, int timer, int cycle, int keta, int zeropadding, int space, int rid, int align) {
 		this(image, null, timer, cycle, keta, zeropadding, space, rid, align);
 	}

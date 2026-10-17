@@ -36,6 +36,57 @@ public class PlayConfig implements Cloneable {
 	public static final int BMSIR_HISPEED_REFERENCE_BPM_MAX = 400;
 	/** Nullable replay snapshot; ordinary player configuration leaves this null. */
 	private Boolean bmsirLr2HispeedFixReplayEnabled;
+	/** Null keeps legacy player/sidecar selection until a mode is explicitly chosen. */
+	private String bmsirHispeedMode;
+	private Float bmsirLr2Hispeed;
+	public Float getBmsirLr2Hispeed() { return bmsirLr2Hispeed; }
+	public void setBmsirLr2Hispeed(Float value) { bmsirLr2Hispeed = value; }
+	public float getEffectiveLr2Hispeed() { return bmsirLr2Hispeed != null ? bmsirLr2Hispeed : hispeed; }
+	public static final String HISPEED_MODE_NORMAL = "normal";
+	public static final String HISPEED_MODE_LR2 = "lr2";
+	public static final String HISPEED_MODE_FLOATING = "floating";
+
+	public String getBmsirHispeedMode() { return bmsirHispeedMode; }
+	public void setBmsirHispeedMode(String value) {
+		bmsirHispeedMode = normalizeHispeedMode(value);
+		if (bmsirHispeedMode != null) bmsirFloatingHispeedEnabled = HISPEED_MODE_FLOATING.equals(bmsirHispeedMode);
+	}
+	public String resolveBmsirHispeedMode(boolean legacyLr2) {
+		String explicit = normalizeHispeedMode(bmsirHispeedMode);
+		if (explicit != null) return explicit;
+		if (bmsirFloatingHispeedEnabled) return HISPEED_MODE_FLOATING;
+		return (bmsirLr2HispeedFixReplayEnabled != null ? bmsirLr2HispeedFixReplayEnabled : legacyLr2)
+				? HISPEED_MODE_LR2 : HISPEED_MODE_NORMAL;
+	}
+	public static String normalizeHispeedMode(String value) {
+		return HISPEED_MODE_NORMAL.equals(value) || HISPEED_MODE_LR2.equals(value)
+				|| HISPEED_MODE_FLOATING.equals(value) ? value : null;
+	}
+
+	/** Independent per-mode floating speed and unrounded visible time (60 Hz frames). */
+	private boolean bmsirFloatingHispeedEnabled;
+	private float bmsirFloatingHispeed = 2.0f;
+	private float bmsirFloatingGreenFrames = 30.0f;
+	private boolean bmsirFloatingCoverVisible = true;
+	private float bmsirFloatingSuddenLiftVisiblePixels = -1f;
+
+	public boolean isBmsirFloatingHispeedEnabled() {
+		return bmsirHispeedMode != null ? HISPEED_MODE_FLOATING.equals(bmsirHispeedMode) : bmsirFloatingHispeedEnabled;
+	}
+	public void setBmsirFloatingHispeedEnabled(boolean enabled) {
+		bmsirFloatingHispeedEnabled = enabled;
+		if (bmsirHispeedMode != null && (enabled || HISPEED_MODE_FLOATING.equals(bmsirHispeedMode))) {
+			bmsirHispeedMode = enabled ? HISPEED_MODE_FLOATING : HISPEED_MODE_NORMAL;
+		}
+	}
+	public float getBmsirFloatingHispeed() { return bmsirFloatingHispeed; }
+	public void setBmsirFloatingHispeed(float value) { bmsirFloatingHispeed = value; }
+	public float getBmsirFloatingGreenFrames() { return bmsirFloatingGreenFrames; }
+	public void setBmsirFloatingGreenFrames(float value) { bmsirFloatingGreenFrames = value; }
+	public boolean isBmsirFloatingCoverVisible() { return bmsirFloatingCoverVisible; }
+	public void setBmsirFloatingCoverVisible(boolean visible) { bmsirFloatingCoverVisible = visible; }
+	public float getBmsirFloatingSuddenLiftVisiblePixels() { return bmsirFloatingSuddenLiftVisiblePixels; }
+	public void setBmsirFloatingSuddenLiftVisiblePixels(float value) { bmsirFloatingSuddenLiftVisiblePixels = value; }
 
 	/**
 	 * CONSTANT 使用
@@ -331,6 +382,13 @@ public class PlayConfig implements Cloneable {
 	}
 
 	public void validate() {
+		bmsirHispeedMode = normalizeHispeedMode(bmsirHispeedMode);
+		if (bmsirLr2Hispeed != null) bmsirLr2Hispeed = Float.isFinite(bmsirLr2Hispeed)
+				? MathUtils.clamp(bmsirLr2Hispeed, HISPEED_MIN, HISPEED_MAX) : HISPEED_MIN;
+		bmsirFloatingHispeed = bms.player.beatoraja.play.BMSIRFloatingHispeed.clampMultiplier(bmsirFloatingHispeed);
+		if (!Float.isFinite(bmsirFloatingGreenFrames) || bmsirFloatingGreenFrames < 0f) {
+			bmsirFloatingGreenFrames = 30f;
+		}
 		hispeed = MathUtils.clamp(hispeed, HISPEED_MIN, HISPEED_MAX);
 		duration = MathUtils.clamp(duration, DURATION_MIN, DURATION_MAX);
 		bmsirBaseScrollSpeed = MathUtils.clamp(

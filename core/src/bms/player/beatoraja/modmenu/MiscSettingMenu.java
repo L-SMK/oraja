@@ -9,6 +9,7 @@ import bms.player.beatoraja.MainController;
 import bms.player.beatoraja.PlayConfig;
 import bms.player.beatoraja.PlayerConfig;
 import bms.player.beatoraja.arena.bmsir.BMSIRArenaI18n;
+import bms.player.beatoraja.arena.bmsir.BMSIRArenaOverlay;
 import bms.player.beatoraja.select.MusicSelector;
 import imgui.ImGui;
 import imgui.flag.ImGuiCond;
@@ -47,7 +48,7 @@ public class MiscSettingMenu {
     private static final ImInt LANE_COVER_SWITCH_DURATION = new ImInt(0);
     private static final ImBoolean ENABLE_CONSTANT = new ImBoolean(false);
     private static final ImInt CONSTANT_VALUE = new ImInt(0);
-    private static final ImBoolean PROFILE_SWITCHER = new ImBoolean(false);
+    private static final ImBoolean END_PLAY_AT_LAST_NOTE = new ImBoolean(false);
     private static ImInt SELECTED_PLAYER;
 
     private static String[] players = PlayerConfig.readAllPlayerID("player");
@@ -57,24 +58,16 @@ public class MiscSettingMenu {
     }
 
 
-    public static void show(ImBoolean showMiscSetting) {
+    /** Per-mode lane and visibility settings; key profiles are the same editor the Arena overlay shows. */
+    public static void showPlaySettings(ImBoolean open) {
         // TODO: We can setup preferred game mode here in future
         if (CURRENT_PLAY_MODE == null) {
             changePlayMode(Mode.BEAT_7K);
         }
 
-        float relativeX = windowWidth * 0.455f;
-        float relativeY = windowHeight * 0.04f;
-        ImGui.setNextWindowPos(relativeX, relativeY, ImGuiCond.FirstUseEver);
-
-        if (ImGui.begin(t("その他設定", "Misc Settings") + "###misc-settings",
-                showMiscSetting, ImGuiWindowFlags.AlwaysAutoResize)) {
-            renderEqualizer();
-            if (ImGui.combo(t("通知位置", "Notification Position"),
-                    NOTIFICATION_POSITION, ImGuiNotify.notificationPositions())) {
-                ImGuiNotify.setNotificationPosition(NOTIFICATION_POSITION.get());
-            }
-
+        ImGui.setNextWindowPos(windowWidth * 0.455f, windowHeight * 0.04f, ImGuiCond.FirstUseEver);
+        if (ImGui.begin(t("プレイ設定", "Play Settings") + "###play-settings",
+                open, ImGuiWindowFlags.AlwaysAutoResize)) {
             // Below settings are depending on different play mode
             if (ImGui.combo(t("プレイモード", "Play Mode"), PLAY_MODE_VALUE, PLAY_MODE_OPTIONS)) {
                 changePlayMode(Mode.getMode(PLAY_MODE_OPTIONS[PLAY_MODE_VALUE.get()]));
@@ -92,13 +85,13 @@ public class MiscSettingMenu {
                 getPlayConfig().setEnablehidden(ENABLE_HIDDEN.get());
             }
             ImGui.sameLine();
-			if (ImGui.inputInt(t("HIDDEN値", "HIDDEN Value"), HIDDEN_VALUE)) {
-				getPlayConfig().setHidden(HIDDEN_VALUE.get() / 1000f);
-			}
+            if (ImGui.inputInt(t("HIDDEN値", "HIDDEN Value"), HIDDEN_VALUE)) {
+                getPlayConfig().setHidden(HIDDEN_VALUE.get() / 1000f);
+            }
 
-			if (ImGui.checkbox(t("レーンカバーを有効にする", "Enable Lane Cover"), ENABLE_LANECOVER)) {
-				getPlayConfig().setEnablelanecover(ENABLE_LANECOVER.get());
-			}
+            if (ImGui.checkbox(t("レーンカバーを有効にする", "Enable Lane Cover"), ENABLE_LANECOVER)) {
+                getPlayConfig().setEnablelanecover(ENABLE_LANECOVER.get());
+            }
             if (ImGui.inputInt(t("レーンカバー値", "Lane Cover Value"), LANECOVER_VALUE)) {
                 getPlayConfig().setLanecover(LANECOVER_VALUE.get() / 1000f);
             }
@@ -119,11 +112,63 @@ public class MiscSettingMenu {
             if (ImGui.inputInt(t("CONSTANTフェードイン", "CONSTANT Fade-in"), CONSTANT_VALUE)) {
                 getPlayConfig().setConstantFadeinTime(CONSTANT_VALUE.get());
             }
+
+            PlayerConfig player = main.getPlayerConfig();
+            END_PLAY_AT_LAST_NOTE.set(player.isEndPlayAtLastNote());
+            if (ImGui.checkbox(t("最終ノーツ後すぐに終了", "End play at last note"), END_PLAY_AT_LAST_NOTE)) {
+                player.setEndPlayAtLastNote(END_PLAY_AT_LAST_NOTE.get());
+            }
+            if (ImGui.isItemHovered()) {
+                ImGui.setTooltip(t("最後のノーツ（LN終端を含む）の判定が確定したら、余韻を待たずにリザルトへ進みます。",
+                        "Goes to the result as soon as the last note (including LN ends) is judged, without the trailing wait."));
+            }
+
+            if (ImGui.collapsingHeader(t("キープロファイル", "Key Profiles") + "###play-settings-key-profiles")) {
+                BMSIRArenaOverlay.renderKeyProfiles(player);
+                alsoInArena(t("Arenaオーバーレイの「プロファイル」タブ", "the Arena overlay's Profiles tab"));
+            }
+            ImGui.separator();
+            profileSwitcher();
         }
-
-        profileSwitcher();
-
         ImGui.end();
+    }
+
+    public static void showHispeedSettings(ImBoolean open) {
+        ImGui.setNextWindowPos(windowWidth * 0.462f, windowHeight * 0.06f, ImGuiCond.FirstUseEver);
+        if (ImGui.begin(t("ハイスピード", "HI-SPEED") + "###hispeed-settings", open, ImGuiWindowFlags.AlwaysAutoResize)) {
+            BMSIRArenaOverlay.renderHispeedSettings();
+        }
+        ImGui.end();
+    }
+
+    public static void showSoundSettings(ImBoolean open) {
+        ImGui.setNextWindowPos(windowWidth * 0.47f, windowHeight * 0.08f, ImGuiCond.FirstUseEver);
+        if (ImGui.begin(t("音", "Sound") + "###sound-settings", open, ImGuiWindowFlags.AlwaysAutoResize)) {
+            renderEqualizer();
+            ImGui.text(t("Arena通知音", "Arena sounds"));
+            BMSIRArenaOverlay.renderNotificationSoundSettings(main.getPlayerConfig());
+            alsoInArena(t("Arenaオーバーレイの「設定」タブ", "the Arena overlay's Settings tab"));
+        }
+        ImGui.end();
+    }
+
+    public static void showDisplaySettings(ImBoolean open) {
+        ImGui.setNextWindowPos(windowWidth * 0.485f, windowHeight * 0.12f, ImGuiCond.FirstUseEver);
+        if (ImGui.begin(t("表示", "Display") + "###display-settings", open, ImGuiWindowFlags.AlwaysAutoResize)) {
+            if (ImGui.combo(t("通知位置", "Notification Position"),
+                    NOTIFICATION_POSITION, ImGuiNotify.notificationPositions())) {
+                ImGuiNotify.setNotificationPosition(NOTIFICATION_POSITION.get());
+            }
+            PlayerConfig player = main.getPlayerConfig();
+            BMSIRArenaOverlay.renderLanguageSetting(player);
+            BMSIRArenaOverlay.renderDisplayToggles(player);
+            alsoInArena(t("Arenaオーバーレイの「設定」タブ", "the Arena overlay's Settings tab"));
+        }
+        ImGui.end();
+    }
+
+    private static void alsoInArena(String place) {
+        ImGui.textDisabled(t(place + "でも変更できます", "Also available in " + place));
     }
 
     public static void setMain(MainController main) {
@@ -133,7 +178,7 @@ public class MiscSettingMenu {
     }
 
     private static void renderEqualizer() {
-        if (!ImGui.collapsingHeader(t("出力イコライザー", "Output Equalizer") + "###output-equalizer")) return;
+        ImGui.text(t("出力イコライザー", "Output Equalizer"));
         AudioConfig audio = config.getAudioConfig();
         ImInt modeIndex = new ImInt(audio.getEqualizerMode().ordinal());
         boolean changed = ImGui.combo(t("方式", "Mode") + "##eq-mode", modeIndex,

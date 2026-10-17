@@ -29,6 +29,11 @@ import bms.player.beatoraja.skin.*;
 import bms.player.beatoraja.song.SongData;
 
 public class IntegerPropertyFactory {
+	private static int savedGreenNumber(PlayConfig pc) {
+		return pc.isBmsirFloatingHispeedEnabled()
+				? BMSIRFloatingHispeed.greenNumber(pc.getBmsirFloatingGreenFrames())
+				: pc.getDuration() * 3 / 5;
+	}
 
 	private static final int ID_LENGTH = 65536;
 	private static final IntegerProperty[] vcache = new IntegerProperty[ID_LENGTH];
@@ -56,6 +61,9 @@ public class IntegerPropertyFactory {
 						case 3 -> lanerender.getMaxBPM();
 						default -> 0;
 					};
+					if (lanerender.isFloatingHispeedEnabled()) {
+						return green ? lanerender.floatingGreenNumber(bpm, cover) : lanerender.floatingDuration(bpm, cover);
+					}
 					return (int) Math.round((240000 / bpm / lanerender.getHispeed())
 							* (cover ? 1 - lanerender.getLanecover() : 1) * (green ? 0.6 : 1));
 				}
@@ -243,7 +251,7 @@ public class IntegerPropertyFactory {
 					SongData song = state.resource.getSongdata();
 					PlayConfig pc = state.resource.getPlayerConfig().getPlayConfig(song.getMode())
 							.getPlayconfig();
-					return (int) (pc.getHispeed() * 100);
+					return (int) (BMSIRFloatingHispeed.displayMultiplier(pc) * 100);
 				}
 				return Integer.MIN_VALUE;
 			};
@@ -255,7 +263,7 @@ public class IntegerPropertyFactory {
 					SongData song = state.resource.getSongdata();
 					PlayConfig pc = state.resource.getPlayerConfig().getPlayConfig(song.getMode())
 							.getPlayconfig();
-					return (int) pc.getHispeed();
+					return (int) BMSIRFloatingHispeed.displayMultiplier(pc);
 				}
 				return Integer.MIN_VALUE;
 			};
@@ -267,7 +275,7 @@ public class IntegerPropertyFactory {
 					SongData song = state.resource.getSongdata();
 					PlayConfig pc = state.resource.getPlayerConfig().getPlayConfig(song.getMode())
 							.getPlayconfig();
-					return (int) (pc.getHispeed() * 100) % 100;
+					return (int) (BMSIRFloatingHispeed.displayMultiplier(pc) * 100) % 100;
 				}
 				return Integer.MIN_VALUE;
 			};
@@ -335,16 +343,16 @@ public class IntegerPropertyFactory {
 			};
 		case NUMBER_GROOVEGAUGE:
 			return (state) -> {
+				final boolean fractional = state != null && state.getSkin() != null && state.getSkin().hasGaugeFraction();
 				if (state instanceof BMSPlayer) {
-					return ((BMSPlayer) state).getGauge().getGauge().getDisplayValue();
+					return ((BMSPlayer) state).getGauge().getGauge().getDisplayValue(fractional);
 				}
 				if (state instanceof AbstractResult) {
 					final int gaugeType = ((AbstractResult) state).getGaugeType();
-					if (bms.player.beatoraja.play.NantokaManiaRules.isActive(state.resource.getBMSModel())) {
-						return (int) (state.resource.getGauge()[gaugeType].peek() / 2) * 2;
-					}
-					return (int) state.resource.getGauge()[gaugeType]
-							.get(state.resource.getGauge()[gaugeType].size - 1);
+					final float value = state.resource.getGauge()[gaugeType].peek();
+					final int display = NantokaManiaRules.isActive(state.resource.getBMSModel())
+							? (int) (value / 2) * 2 : (int) value;
+					return fractional ? display : GaugeDisplay.minimumPositivePercent(value, display);
 				}
 				return Integer.MIN_VALUE;
 			};
@@ -692,13 +700,15 @@ public class IntegerPropertyFactory {
 		duration_green(313, (state) -> {
 			if (state instanceof MusicSelector selector) {
 				final PlayConfig pc = selector.getSelectedBarPlayConfig();
-				return pc != null ? pc.getDuration() * 3 / 5 : Integer.MIN_VALUE;
+				return pc != null ? savedGreenNumber(pc) : Integer.MIN_VALUE;
 			} else if (state instanceof BMSPlayer player) {
-				return player.getLanerender().getCurrentDuration() * 3 / 5;
+				LaneRenderer lane = player.getLanerender();
+				return lane.isFloatingHispeedEnabled() ? lane.floatingGreenNumber(lane.getNowBPM(), true)
+						: lane.getCurrentDuration() * 3 / 5;
 			} else if (state.resource.getSongdata() != null) {
 				SongData song = state.resource.getSongdata();
 				PlayConfig pc = state.resource.getPlayerConfig().getPlayConfig(song.getMode()).getPlayconfig();
-				return pc.getDuration() * 3 / 5;
+				return savedGreenNumber(pc);
 			}
 			return Integer.MIN_VALUE;
 		}),

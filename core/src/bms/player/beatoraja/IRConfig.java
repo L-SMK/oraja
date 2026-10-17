@@ -106,7 +106,7 @@ public class IRConfig implements Validatable{
 	}
 
 	public boolean validate() {
-		if(irname == null || irname.length() == 0 || IRConnectionManager.getIRConnectionClass(irname) == null) {
+		if(irname == null || irname.isBlank()) {
 			return false;
 		}
 		

@@ -37,6 +37,35 @@ import java.util.stream.Stream;
  * @author excln
  */
 public class EventFactory {
+	static boolean changeConfiguredHispeed(PlayConfig pc, boolean legacyLr2, boolean increase) {
+		if (pc == null) return false;
+		String mode = pc.resolveBmsirHispeedMode(legacyLr2);
+		pc.setBmsirHispeedMode(mode);
+		if (PlayConfig.HISPEED_MODE_FLOATING.equals(mode)) {
+			float previous = pc.getBmsirFloatingGreenFrames();
+			bms.player.beatoraja.play.BMSIRFloatingHispeed.changeGreen(pc, increase ? .5f : -.5f);
+			return previous != pc.getBmsirFloatingGreenFrames();
+		}
+		boolean lr2 = PlayConfig.HISPEED_MODE_LR2.equals(mode);
+		float previous = lr2 ? pc.getEffectiveLr2Hispeed() : pc.getHispeed();
+		float next = MathUtils.clamp(previous + pc.getHispeedMargin() * (increase ? 1 : -1), PlayConfig.HISPEED_MIN, PlayConfig.HISPEED_MAX);
+		if (lr2) pc.setBmsirLr2Hispeed(next); else pc.setHispeed(next);
+		return previous != next;
+	}
+
+	static boolean changeConfiguredDuration(PlayConfig pc, boolean legacyLr2, int delta) {
+		if (pc == null) return false;
+		String mode = pc.resolveBmsirHispeedMode(legacyLr2);
+		if (PlayConfig.HISPEED_MODE_LR2.equals(mode)) return false;
+		if (PlayConfig.HISPEED_MODE_FLOATING.equals(mode)) {
+			float previous = pc.getBmsirFloatingGreenFrames();
+			float next = MathUtils.clamp(previous + delta * .06f, 1f, 600f);
+			pc.setBmsirFloatingGreenFrames(next); return previous != next;
+		}
+		int previous = pc.getDuration();
+		pc.setDuration(MathUtils.clamp(previous + delta, PlayConfig.DURATION_MIN, PlayConfig.DURATION_MAX));
+		return previous != pc.getDuration();
+	}
 	
 	/**
 	 * ID指定によるイベント取得(組み込みまたはカスタムイベントとして登録したもの)
@@ -249,11 +278,8 @@ public class EventFactory {
 	     */
 		hispeed1p(57, (state, arg1) -> {
 			if(state instanceof MusicSelector selector) {
-	            PlayConfig pc = selector.getSelectedBarPlayConfig();	            
-            	float hispeed = pc.getHispeed() + (arg1 >= 0 ? pc.getHispeedMargin() : -pc.getHispeedMargin());
-            	hispeed = MathUtils.clamp(hispeed, PlayConfig.HISPEED_MIN, PlayConfig.HISPEED_MAX);
-            	if(hispeed != pc.getHispeed()) {
-            		pc.setHispeed(hispeed);
+	            PlayConfig pc = selector.getSelectedBarPlayConfig();
+				if (changeConfiguredHispeed(pc, state.resource.getPlayerConfig().isBmsirLr2HispeedFixEnabled(), arg1 >= 0)) {
 	                state.play(OPTION_CHANGE);		        	
             	}
 			}
@@ -265,10 +291,7 @@ public class EventFactory {
 			if(state instanceof MusicSelector selector) {
 	            PlayConfig pc = selector.getSelectedBarPlayConfig();	            
             	final int inc = arg2 > 0 ? arg2 : 1;
-            	int duration = pc.getDuration() + (arg1 >= 0 ? inc : -inc);
-        		duration = MathUtils.clamp(duration, PlayConfig.DURATION_MIN, PlayConfig.DURATION_MAX);
-		        if(duration != pc.getDuration()) {
-		        	pc.setDuration(duration);
+		        if (changeConfiguredDuration(pc, state.resource.getPlayerConfig().isBmsirLr2HispeedFixEnabled(), arg1 >= 0 ? inc : -inc)) {
 	                state.play(OPTION_CHANGE);		        	
 		        }	            	
 			}

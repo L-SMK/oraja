@@ -58,6 +58,7 @@ class IRLongNoteContractTest {
         SongData chart = song(2, 0);
         ScoreData play = new ScoreData(); play.setMode(0); play.setBmsirEffectiveLnType(1);
         play.setNotes(4); play.setDate(100);
+        play.setBmsirFloatingHispeedUsed(true);
         java.util.concurrent.atomic.AtomicReference<IRScoreData> sent = new java.util.concurrent.atomic.AtomicReference<>();
         IRConnection ir = (IRConnection)java.lang.reflect.Proxy.newProxyInstance(IRConnection.class.getClassLoader(),
                 new Class<?>[]{IRConnection.class}, (proxy, method, args) -> {
@@ -73,9 +74,11 @@ class IRLongNoteContractTest {
                 });
         MainController.IRSendStatus queue = new MainController.IRSendStatus(ir, chart, play);
         play.setBmsirEffectiveLnType(0); play.setNotes(3); play.setDate(200);
+        play.setBmsirFloatingHispeedUsed(false);
         chart.setNotes(3);
         assertTrue(queue.send());
         assertEquals(1, sent.get().lntype); assertEquals(4, sent.get().notes); assertEquals(100, sent.get().date);
+        assertTrue(sent.get().bmsirFloatingHispeedUsed);
     }
 
     @Test void invalidRowsNeverReplaceACompatibleRanking() {

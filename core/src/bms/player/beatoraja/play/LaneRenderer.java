@@ -60,7 +60,9 @@ public class LaneRenderer {
 
 	private int currentduration;
 	private double currentscroll = 1.0;
-	private final boolean bmsirLr2HispeedFixEnabled;
+	private boolean bmsirLr2HispeedFixEnabled;
+	private BMSIRFloatingHispeed.Transition floatingTransition;
+	private boolean noSpeedConstraint;
 
 	private double basebpm;
 	private double nowbpm;
@@ -97,27 +99,29 @@ public class LaneRenderer {
 		BMSIRManiacPlayContext maniacContext = main.resource.getManiacPlayContext();
 		this.maniacSettings = maniacContext == null ? null : maniacContext.settings();
 		this.playconfig = config.getPlayConfig(model.getMode()).getPlayconfig().clone();
-		boolean noSpeedConstraint = false;
+		noSpeedConstraint = false;
 		for (CourseData.CourseDataConstraint constraint : main.resource.getConstraint()) {
 			if (constraint == NO_SPEED) {
 				noSpeedConstraint = true;
 				break;
 			}
 		}
-		BMSPlayerMode playMode = main.resource.getPlayMode();
-		Boolean replaySetting = playconfig.getBmsirLr2HispeedFixReplayEnabled();
-		boolean replayUsesSnapshot = playMode != null
-				&& playMode.mode == BMSPlayerMode.Mode.REPLAY
-				&& replaySetting != null;
+		playconfig.setBmsirHispeedMode(playconfig.resolveBmsirHispeedMode(config.isBmsirLr2HispeedFixEnabled()));
+		if (playconfig.getBmsirLr2Hispeed() == null) playconfig.setBmsirLr2Hispeed(playconfig.getHispeed());
+		if (noSpeedConstraint) playconfig.setBmsirHispeedMode(PlayConfig.HISPEED_MODE_NORMAL);
+		if (noSpeedConstraint) playconfig.setBmsirFloatingHispeedEnabled(false);
 		this.bmsirLr2HispeedFixEnabled = !noSpeedConstraint
-				&& (replayUsesSnapshot
-						? replaySetting
-						: config.isBmsirLr2HispeedFixEnabled());
+				&& PlayConfig.HISPEED_MODE_LR2.equals(playconfig.getBmsirHispeedMode());
 		playconfig.setBmsirLr2HispeedFixReplayEnabled(
 				this.bmsirLr2HispeedFixEnabled
 		);
 
+		if (isFloatingHispeedEnabled() && !main.restoresReplayLaneSettings()) {
+			BMSIRFloatingHispeed.normalizeCovers(playconfig);
+			playconfig.setBmsirFloatingCoverVisible(playconfig.isEnablelanecover() || playconfig.isEnablehidden());
+		}
 		init(model);
+		floatingTransition = new BMSIRFloatingHispeed.Transition(playconfig.getBmsirFloatingHispeed(), 0);
 
 		for (CourseData.CourseDataConstraint i : main.resource.getConstraint()) {
 			if (i == NO_SPEED) {
@@ -178,7 +182,9 @@ public class LaneRenderer {
 			default -> basebpm;
 		};
 
-		this.setLanecover(playconfig.getLanecover());
+		if (isFloatingHispeedEnabled()) {
+			BMSIRFloatingHispeed.restoreGreen(playconfig, model.getBpm());
+		} else this.setLanecover(playconfig.getLanecover());
 		basehispeed = playconfig.getHispeed();
 		this.hispeedmargin = playconfig.getHispeedMargin();
 		this.startHerePreview = StartHerePreviewData.build(model);
@@ -195,6 +201,8 @@ public class LaneRenderer {
 	}
 
 	public float getHispeed() {
+		if (isFloatingHispeedEnabled()) return playconfig.getBmsirFloatingHispeed();
+		if (bmsirLr2HispeedFixEnabled) return playconfig.getEffectiveLr2Hispeed();
 		return playconfig.getHispeed();
 	}
 
@@ -203,10 +211,17 @@ public class LaneRenderer {
 	}
 
 	public int getDuration() {
+		if (isFloatingHispeedEnabled()) return Math.round(playconfig.getBmsirFloatingGreenFrames() / 0.06f);
 		return playconfig.getDuration();
 	}
 
 	public void setDuration(int gvalue) {
+		if (isFloatingHispeedEnabled()) {
+			playconfig.setBmsirFloatingGreenFrames(Math.max(1f, gvalue * 0.06f));
+			BMSIRFloatingHispeed.restoreGreen(playconfig, nowbpm, currentscroll);
+			updateStartHerePreviewMetrics();
+			return;
+		}
 		if (bmsirLr2HispeedFixEnabled) {
 			return;
 		}
@@ -249,6 +264,11 @@ public class LaneRenderer {
 	}
 
 	public void resetHispeed(double targetbpm) {
+		if (isFloatingHispeedEnabled()) {
+			BMSIRFloatingHispeed.restoreGreen(playconfig, targetbpm, currentscroll);
+			updateStartHerePreviewMetrics();
+			return;
+		}
 		if (bmsirLr2HispeedFixEnabled) {
 			updateStartHerePreviewMetrics();
 			return;
@@ -268,7 +288,9 @@ public class LaneRenderer {
 	
 	public void setLanecover(float lanecover) {
 		setLanecoverValue(lanecover);
-		if (!bmsirLr2HispeedFixEnabled) {
+		if (isFloatingHispeedEnabled()) {
+			BMSIRFloatingHispeed.restoreGreen(playconfig, nowbpm, currentscroll);
+		} else if (!bmsirLr2HispeedFixEnabled) {
 			resetHispeed(basebpm);
 		}
 		updateStartHerePreviewMetrics();
@@ -280,7 +302,9 @@ public class LaneRenderer {
 			double targetBpm
 	) {
 		setLanecoverValue(lanecover);
-		if (bmsirLr2HispeedFixEnabled) {
+		if (isFloatingHispeedEnabled()) {
+			BMSIRFloatingHispeed.restoreGreen(playconfig, targetBpm, currentscroll);
+		} else if (bmsirLr2HispeedFixEnabled) {
 			// LR2 mode keeps the applied speed independent from cover.
 		} else if (recalculateHispeed && Double.isFinite(targetBpm) && targetBpm > 0.0) {
 			resetHispeed(targetBpm);
@@ -295,6 +319,7 @@ public class LaneRenderer {
 	}
 
 	private void syncFixedDurationToHispeed() {
+		if (isFloatingHispeedEnabled()) return;
 		if (playconfig.getFixhispeed() == PlayConfig.FIX_HISPEED_OFF
 				|| !Double.isFinite(basebpm)
 				|| basebpm <= 0.0
@@ -336,7 +361,7 @@ public class LaneRenderer {
 	}
 
 	public boolean isEnableLanecover() {
-		return playconfig.isEnablelanecover();
+		return playconfig.isEnablelanecover() && (!isFloatingHispeedEnabled() || playconfig.isBmsirFloatingCoverVisible());
 	}
 
 	public float getHiddenCover() {
@@ -352,10 +377,19 @@ public class LaneRenderer {
 	}
 
 	public boolean isEnableHidden() {
-		return playconfig.isEnablehidden();
+		return playconfig.isEnablehidden() && (!isFloatingHispeedEnabled() || playconfig.isBmsirFloatingCoverVisible());
 	}
 
 	public void changeHispeed(boolean b) {
+		if (isFloatingHispeedEnabled()) {
+			BMSIRFloatingHispeed.changeGreen(playconfig, BMSIRFloatingHispeed.KEY_STEP * (b ? 1 : -1));
+			updateStartHerePreviewMetrics();
+			return;
+		}
+		if (bmsirLr2HispeedFixEnabled) {
+			setHispeed(playconfig.getEffectiveLr2Hispeed() + hispeedmargin * (b ? 1 : -1));
+			return;
+		}
 		float f = hispeedStep(bmsirLr2HispeedFixEnabled, playconfig.getFixhispeed(),
 				basehispeed, hispeedmargin) * (b ? 1 : -1);
 		if (playconfig.getHispeed() + f > 0 && playconfig.getHispeed() + f < 20) {
@@ -373,6 +407,12 @@ public class LaneRenderer {
 	}
 
 	public void addHispeed(float delta) {
+		if (bmsirLr2HispeedFixEnabled) { setHispeed(playconfig.getEffectiveLr2Hispeed() + delta); return; }
+		if (isFloatingHispeedEnabled()) {
+			BMSIRFloatingHispeed.changeGreen(playconfig, delta);
+			updateStartHerePreviewMetrics();
+			return;
+		}
 		float next = playconfig.getHispeed() + delta;
 		if (Float.isFinite(next) && next > 0f && next < 20f) {
 			playconfig.setHispeed(next);
@@ -385,6 +425,16 @@ public class LaneRenderer {
 
 	public void setHispeed(float hispeed) {
 		if (!Float.isFinite(hispeed)) {
+			return;
+		}
+		if (bmsirLr2HispeedFixEnabled) {
+			playconfig.setBmsirLr2Hispeed(Math.max(PlayConfig.HISPEED_MIN, Math.min(PlayConfig.HISPEED_MAX, hispeed)));
+			updateStartHerePreviewMetrics();
+			return;
+		}
+		if (isFloatingHispeedEnabled()) {
+			BMSIRFloatingHispeed.setMultiplierKeepingRatio(playconfig, hispeed);
+			updateStartHerePreviewMetrics();
 			return;
 		}
 		playconfig.setHispeed(Math.max(
@@ -404,8 +454,103 @@ public class LaneRenderer {
 		return playconfig;
 	}
 
+    public bms.player.beatoraja.ReplayLaneState captureReplayLaneState(long time) {
+        return bms.player.beatoraja.ReplayLaneState.capture(time, getPlayConfig(), bmsirLr2HispeedFixEnabled);
+    }
+
+    public void applyReplayLaneState(bms.player.beatoraja.ReplayLaneState state) {
+        String previousMode = playconfig.getBmsirHispeedMode();
+        state.apply(playconfig);
+		playconfig.setBmsirHispeedMode(playconfig.resolveBmsirHispeedMode(config != null && config.isBmsirLr2HispeedFixEnabled()));
+		if (isFloatingHispeedEnabled() && (state.time == 0 || !PlayConfig.HISPEED_MODE_FLOATING.equals(previousMode))) {
+			floatingTransition = new BMSIRFloatingHispeed.Transition(playconfig.getBmsirFloatingHispeed(), state.time / 1000);
+		}
+		if (floatingTransition != null && isFloatingHispeedEnabled()) {
+			floatingTransition.update(playconfig.getBmsirFloatingHispeed(), BMSIRFloatingHispeed.hasCover(playconfig), state.time / 1000);
+		}
+        Boolean fixed = playconfig.getBmsirLr2HispeedFixReplayEnabled();
+        bmsirLr2HispeedFixEnabled = PlayConfig.HISPEED_MODE_LR2.equals(playconfig.getBmsirHispeedMode());
+        basebpm = switch (playconfig.getFixhispeed()) {
+            case PlayConfig.FIX_HISPEED_STARTBPM -> model.getBpm();
+            case PlayConfig.FIX_HISPEED_MINBPM -> minbpm;
+            case PlayConfig.FIX_HISPEED_MAXBPM -> maxbpm;
+            case PlayConfig.FIX_HISPEED_MAINBPM -> mainbpm;
+            default -> basebpm;
+        };
+        basehispeed = playconfig.getHispeed();
+        if (main.timer.isTimerOn(TIMER_PLAY)) {
+            // Skin numeric properties are prepared before drawLane. Do not replace
+            // the current BPM/scroll with the Start Here anchor during playback.
+            float speed = appliedHispeed(nowbpm, currentscroll);
+            currentduration = isFloatingHispeedEnabled() ? floatingDuration(nowbpm, true) : bmsirLr2HispeedFixEnabled
+                    ? BMSIRHispeed.currentDuration(speed, nowbpm, currentscroll,
+                            playconfig.isEnablelanecover(), playconfig.getLanecover(),
+                            playconfig.isEnablelift(), playconfig.getLift())
+                    : (int)Math.round(currentscroll > 0 && nowbpm > 0
+                            ? 240000 / nowbpm / speed / currentscroll
+                                    * (1 - (playconfig.isEnablelanecover() ? playconfig.getLanecover() : 0)) : 0);
+        } else updateStartHerePreviewMetrics();
+    }
+
 	public boolean isBmsirLr2HispeedFixEnabled() {
 		return bmsirLr2HispeedFixEnabled;
+	}
+
+	public boolean isFloatingHispeedEnabled() { return playconfig.isBmsirFloatingHispeedEnabled(); }
+
+	public boolean canChangeHispeedMode() {
+		return !noSpeedConstraint && (main == null || main.resource == null || !main.restoresReplayLaneSettings());
+	}
+
+	public void setFixHispeed(int value) {
+		if (!canChangeHispeedMode()) return;
+		playconfig.setFixhispeed(Math.max(0, Math.min(4, value)));
+		String mode = playconfig.getBmsirHispeedMode();
+		playconfig.setBmsirHispeedMode(null);
+		setBmsirHispeedMode(mode);
+	}
+
+	public boolean setBmsirHispeedMode(String mode) {
+		if (!canChangeHispeedMode() || PlayConfig.normalizeHispeedMode(mode) == null) return false;
+		if (mode.equals(playconfig.getBmsirHispeedMode())) return true;
+		playconfig.setBmsirHispeedMode(mode);
+		bmsirLr2HispeedFixEnabled = PlayConfig.HISPEED_MODE_LR2.equals(mode);
+		playconfig.setBmsirLr2HispeedFixReplayEnabled(bmsirLr2HispeedFixEnabled);
+		basebpm = switch (playconfig.getFixhispeed()) {
+			case PlayConfig.FIX_HISPEED_STARTBPM -> model.getBpm();
+			case PlayConfig.FIX_HISPEED_MINBPM -> minbpm;
+			case PlayConfig.FIX_HISPEED_MAXBPM -> maxbpm;
+			case PlayConfig.FIX_HISPEED_MAINBPM -> mainbpm;
+			default -> basebpm;
+		};
+		if (isFloatingHispeedEnabled()) {
+			BMSIRFloatingHispeed.normalizeCovers(playconfig);
+			BMSIRFloatingHispeed.restoreGreen(playconfig, nowbpm, currentscroll);
+			long time = main != null && main.timer != null && main.timer.isTimerOn(TIMER_PLAY) ? main.timer.getNowTime(TIMER_PLAY) : 0;
+			floatingTransition = new BMSIRFloatingHispeed.Transition(playconfig.getBmsirFloatingHispeed(), time);
+		} else if (!bmsirLr2HispeedFixEnabled) resetHispeed(basebpm);
+		basehispeed = playconfig.getHispeed();
+		updateStartHerePreviewMetrics();
+		if (main != null) main.resetLaneControlInput();
+		return true;
+	}
+
+	public int floatingGreenNumber(double bpm, boolean covers) {
+		return BMSIRFloatingHispeed.greenNumber(BMSIRFloatingHispeed.visibleFrames(playconfig, bpm, currentscroll, covers));
+	}
+
+	public int floatingDuration(double bpm, boolean covers) {
+		return Math.round(BMSIRFloatingHispeed.visibleFrames(playconfig, bpm, currentscroll, covers) / 0.06f);
+	}
+
+	public void moveFloatingScratch(float ticks) {
+		BMSIRFloatingHispeed.moveScratch(playconfig, ticks, nowbpm, currentscroll);
+		updateStartHerePreviewMetrics();
+	}
+
+	public void toggleFloatingCover() {
+		BMSIRFloatingHispeed.toggleCover(playconfig, nowbpm, currentscroll);
+		updateStartHerePreviewMetrics();
 	}
 
 	public void setBmsirBaseScrollSpeed(int value) {
@@ -423,11 +568,12 @@ public class LaneRenderer {
 	}
 
 	private float appliedHispeed(double bpm, double scroll) {
+		if (isFloatingHispeedEnabled()) return BMSIRFloatingHispeed.appliedHispeed(playconfig);
 		if (!bmsirLr2HispeedFixEnabled) {
 			return playconfig.getHispeed();
 		}
 		return BMSIRHispeed.appliedHispeed(
-				playconfig.getHispeed(),
+				playconfig.getEffectiveLr2Hispeed(),
 				playconfig.getBmsirBaseScrollSpeed(),
 				playconfig.getBmsirHispeedReferenceBpm(),
 				playconfig.getFixhispeed() != PlayConfig.FIX_HISPEED_OFF,
@@ -490,7 +636,10 @@ public class LaneRenderer {
 		nowbpm = nbpm;
 		currentscroll = nscroll;
 		final float hispeed = main.getState() != BMSPlayer.STATE_PRACTICE
-				? appliedHispeed(nbpm, nscroll)
+				? isFloatingHispeedEnabled() && floatingTransition != null
+						? BMSIRFloatingHispeed.appliedHispeed(playconfig, floatingTransition.update(
+								playconfig.getBmsirFloatingHispeed(), BMSIRFloatingHispeed.hasCover(playconfig), time))
+						: appliedHispeed(nbpm, nscroll)
 				: 1.0f;
 		final double region = nscroll > 0 ? (240000 / nbpm / hispeed) / nscroll : 0;
 		// double sect = (bpm / 60) * 4 * 1000;
@@ -500,8 +649,8 @@ public class LaneRenderer {
 		final double rxhs = (hu - hl) * hispeed;
 		double y = hl;
 
-		final float lanecover = playconfig.isEnablelanecover() ? playconfig.getLanecover() : 0;
-		currentduration = bmsirLr2HispeedFixEnabled
+		final float lanecover = isEnableLanecover() ? playconfig.getLanecover() : 0;
+		currentduration = isFloatingHispeedEnabled() ? floatingDuration(nbpm, true) : bmsirLr2HispeedFixEnabled
 				? BMSIRHispeed.currentDuration(
 						hispeed,
 						nbpm,
@@ -517,7 +666,7 @@ public class LaneRenderer {
 		main.main.getOffset(OFFSET_LANECOVER).y = (float) ((hl - hu) * lanecover);
 		// TODO HIDDENとLIFT混在の必要性とHIDDENの必要性
 		final SkinOffset hidden = main.main.getOffset(OFFSET_HIDDEN_COVER);
-		if (playconfig.isEnablehidden()) {
+		if (isEnableHidden()) {
 			hidden.a = 0;
 			if (playconfig.isEnablelift()) {
 				hidden.y =  (1 - playconfig.getLift()) * playconfig.getHidden()
@@ -745,8 +894,6 @@ public class LaneRenderer {
 							lane,
 							lanes.length,
 							model.getMode().player,
-							i,
-							now,
 							dstx,
 							dsty,
 							dstw,
@@ -805,8 +952,6 @@ public class LaneRenderer {
 										lane,
 										lanes.length,
 										model.getMode().player,
-										i,
-										now,
 										dstx,
 										(float) (dsty + dy),
 										dstw,
@@ -943,10 +1088,24 @@ public class LaneRenderer {
 	}
 
 	private void updateStartHerePreviewMetrics() {
+		if (main.timer.isTimerOn(TIMER_PLAY)) {
+			float speed = appliedHispeed(nowbpm, currentscroll);
+			currentduration = isFloatingHispeedEnabled() ? floatingDuration(nowbpm, true)
+					: bmsirLr2HispeedFixEnabled ? BMSIRHispeed.currentDuration(speed, nowbpm, currentscroll,
+							playconfig.isEnablelanecover(), playconfig.getLanecover(), playconfig.isEnablelift(), playconfig.getLift())
+					: (int) Math.round(nowbpm > 0 && currentscroll > 0 ? 240000 / nowbpm / speed / currentscroll
+							* (1 - (playconfig.isEnablelanecover() ? playconfig.getLanecover() : 0)) : 0);
+			return;
+		}
 		if (startHerePreview == null || !startHerePreview.isValid()) {
 			return;
 		}
 		nowbpm = startHerePreview.anchorBpm();
+		if (isFloatingHispeedEnabled()) {
+			currentscroll = startHerePreview.anchorScroll();
+			currentduration = floatingDuration(nowbpm, true);
+			return;
+		}
 		currentduration = startHerePreviewDuration(
 				nowbpm,
 				startHerePreview.anchorScroll(),
@@ -1024,7 +1183,7 @@ public class LaneRenderer {
 									offsetH,
 									playconfig.isEnablelift(),
 									playconfig.getLift(),
-									playconfig.isEnablelanecover(),
+									isEnableLanecover(),
 									playconfig.getLanecover()
 							)
 			) {
@@ -1046,7 +1205,7 @@ public class LaneRenderer {
 					offsetH,
 					playconfig.isEnablelift(),
 					playconfig.getLift(),
-					playconfig.isEnablelanecover(),
+					isEnableLanecover(),
 					playconfig.getLanecover()
 			);
 			sprite.setColor(1f, 1f, 1f, startHerePreviewAlpha(time));
@@ -1150,7 +1309,7 @@ public class LaneRenderer {
 		float lower = playconfig.isEnablelift()
 				? lanes[0].region.y + lanes[0].region.height * playconfig.getLift()
 				: lanes[0].region.y;
-		float laneCover = playconfig.isEnablelanecover() ? playconfig.getLanecover() : 0f;
+		float laneCover = isEnableLanecover() ? playconfig.getLanecover() : 0f;
 		main.main.getOffset(OFFSET_LIFT).y = lower - lanes[0].region.y;
 		main.main.getOffset(OFFSET_LANECOVER).y = (lower - upper) * laneCover;
 	}

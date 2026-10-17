@@ -24,6 +24,42 @@ class BMSIRArenaConfigStoreTest {
     Path temporaryDirectory;
 
     @Test
+    void speedModeAndDisplayRoundTripKeepNewNormalOverLegacyGlobalLr2() throws Exception {
+        PlayerConfig source = player("modes"); source.setBmsirLr2HispeedFixEnabled(true);
+        source.getMode7().getPlayconfig().setBmsirHispeedMode("normal");
+        source.getMode7().getPlayconfig().setHispeed(2.5f); source.getMode7().getPlayconfig().setDuration(450);
+        source.getMode14().getPlayconfig().setBmsirHispeedMode("lr2");
+        source.getMode14().getPlayconfig().setBmsirLr2Hispeed(3.75f); source.setBmsirBgaDisplayEnabled(false);
+        assertTrue(BMSIRArenaConfigStore.write(temporaryDirectory.toString(), source));
+        PlayerConfig restored = player("modes");
+        assertTrue(BMSIRArenaConfigStore.loadOrMigrate(temporaryDirectory.toString(), "modes", restored));
+        assertEquals("normal", restored.getMode7().getPlayconfig().resolveBmsirHispeedMode(true));
+        assertEquals(2.5f, restored.getMode7().getPlayconfig().getHispeed());
+        assertEquals(450, restored.getMode7().getPlayconfig().getDuration());
+        assertEquals("lr2", restored.getMode14().getPlayconfig().getBmsirHispeedMode());
+        assertEquals(3.75f, restored.getMode14().getPlayconfig().getEffectiveLr2Hispeed());
+        assertFalse(restored.isBmsirBgaDisplayEnabled());
+    }
+
+    @Test
+    void floatingSettingsSurviveLegacyBodyRewriteAndKeepModesIndependent() throws Exception {
+        PlayerConfig source = player("floating");
+        var sp = source.getMode7().getPlayconfig();
+        sp.setBmsirFloatingHispeedEnabled(true);
+        sp.setBmsirFloatingHispeed(3.125f);
+        sp.setBmsirFloatingGreenFrames(29.912345f);
+        source.getMode14().getPlayconfig().setBmsirFloatingHispeed(4.25f);
+        assertTrue(BMSIRArenaConfigStore.write(temporaryDirectory.toString(), source));
+        PlayerConfig legacyRewrite = player("floating");
+        assertTrue(BMSIRArenaConfigStore.loadOrMigrate(temporaryDirectory.toString(), "floating", legacyRewrite));
+        assertTrue(legacyRewrite.getMode7().getPlayconfig().isBmsirFloatingHispeedEnabled());
+        assertEquals(3.125f, legacyRewrite.getMode7().getPlayconfig().getBmsirFloatingHispeed());
+        assertEquals(29.912345f, legacyRewrite.getMode7().getPlayconfig().getBmsirFloatingGreenFrames());
+        assertFalse(legacyRewrite.getMode14().getPlayconfig().isBmsirFloatingHispeedEnabled());
+        assertEquals(4.25f, legacyRewrite.getMode14().getPlayconfig().getBmsirFloatingHispeed());
+    }
+
+    @Test
     void playerWriteCreatesAllowListedSidecarWithoutIrCredentials() throws Exception {
         PlayerConfig player = player("player1");
         player.setBmsirArenaEnabled(true);
@@ -112,7 +148,7 @@ class BMSIRArenaConfigStoreTest {
         assertTrue(serialized.contains("\"overlayHotkeyKeys\": ["));
         assertTrue(serialized.contains("\"targetMode\": \"leader\""));
         assertTrue(serialized.contains("\"graphOrder\": \"entry\""));
-        assertTrue(serialized.contains("\"schemaVersion\": 22"));
+        assertTrue(serialized.contains("\"schemaVersion\": 24"));
         assertTrue(serialized.contains("\"startButtonAction\": \"difficulty\""));
         assertTrue(serialized.contains("\"selectButtonAction\": \"key_mode\""));
         assertTrue(serialized.contains("\"selectDifficultyDisplay\": \"lr2\""));
