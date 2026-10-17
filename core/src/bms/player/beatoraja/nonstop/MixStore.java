@@ -96,6 +96,23 @@ public final class MixStore {
         }
     }
 
+    /**
+     * The set the editor opens with: the draft, or the newest saved set with
+     * songs when the draft is empty, so saved work does not look lost (#555).
+     */
+    public MixPlan openingPlan() {
+        MixPlan draft = loadDraft();
+        if (draft != null && !draft.tracks.isEmpty()) {
+            return draft;
+        }
+        for (MixPlan set : listSets()) {
+            if (!set.tracks.isEmpty()) {
+                return set;
+            }
+        }
+        return draft;
+    }
+
     public synchronized void addRecord(MixResult result) throws IOException {
         Files.createDirectories(root);
         String line = MixJson.mapper().writeValueAsString(result.toJson()) + "\n";
