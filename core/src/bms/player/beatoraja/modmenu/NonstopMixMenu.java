@@ -1436,6 +1436,7 @@ public final class NonstopMixMenu {
                 GEN_GENRE.set(plan.tracks.get(selectedTrack).genre);
             }
             ImGui.endDisabled();
+            renderGenreCount();
             ImGui.setNextItemWidth(240);
             ImGui.inputText(t("曲名・アーティスト等で絞る", "Filter by title / artist") + "##nm-filter", GEN_FILTER);
             ImGui.setNextItemWidth(240);
@@ -1636,6 +1637,57 @@ public final class NonstopMixMenu {
         request.rangeTo = GEN_RANGE[1] - 1;
         generated = null;
         generator = MixGenerator.start(plan, request, library);
+    }
+
+    // how many songs the genre condition matches, counted in the background (#565)
+    private static String genreCountKey = "";
+    private static long genreCountChanged;
+    private static volatile int[] genreCounts;
+    private static volatile String genreCountsFor = "";
+    private static volatile boolean genreCounting;
+
+    private static void renderGenreCount() {
+        MixGenreFamily family = GEN_FAMILY.get() > 0 ? MixGenreFamily.values()[GEN_FAMILY.get() - 1] : null;
+        String genre = family != null ? "" : GEN_GENRE.get().trim();
+        if (family == null && genre.isEmpty()) {
+            return;
+        }
+        String key = plan.mode.id + "|" + (family == null ? "" : family.name()) + "|" + genre;
+        long now = System.currentTimeMillis();
+        if (!key.equals(genreCountKey)) {
+            genreCountKey = key;
+            genreCountChanged = now;
+        }
+        int[] counts = key.equals(genreCountsFor) ? genreCounts : null;
+        if (counts == null && !genreCounting && now - genreCountChanged > 400) {
+            // typing settles first; the song database is read off the render thread
+            genreCounting = true;
+            int modeId = plan.mode.id;
+            Thread worker = new Thread(() -> {
+                try {
+                    int[] result = MixGenerator.genreCounts(library, modeId, genre, family);
+                    genreCountsFor = key;
+                    genreCounts = result;
+                } finally {
+                    genreCounting = false;
+                }
+            }, "nonstop-mix-genre-count");
+            worker.setDaemon(true);
+            worker.start();
+        }
+        if (counts == null) {
+            ImGui.textDisabled(t("曲数を数えています…", "Counting songs..."));
+        } else if (family != null) {
+            ImGui.textDisabled(String.format(Locale.ROOT, t("この系統の曲: %d曲", "Songs in this family: %d"), counts[0]));
+        } else {
+            ImGui.textDisabled(String.format(Locale.ROOT,
+                    t("同じジャンル %d曲 / 名前の一部が同じ %d曲 / 同じ系統 %d曲",
+                            "Same genre: %d / sharing a word: %d / same family: %d"), counts[0], counts[1], counts[2]));
+        }
+        if (counts != null && GEN_GENRE_RULE.get() == 0 && ImGui.isItemHovered()) {
+            ImGui.setTooltip(t("「同じジャンルだけ」で曲が足りないときは、名前の一部が同じジャンル → 同じ系統 → 近いジャンル優先の順に広げます",
+                    "When \"Same genre only\" has too few songs, it widens to genres sharing a word, then the family, then the closest genres"));
+        }
     }
 
     private static String[] familyLabels() {
