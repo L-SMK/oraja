@@ -167,7 +167,7 @@ public final class NonstopMixMenu {
         if (plan != null) {
             return;
         }
-        MixPlan draft = main != null ? store().loadDraft() : null;
+        MixPlan draft = main != null ? store().openingPlan() : null;
         plan = draft != null ? draft : new MixPlan();
         syncTextFields();
     }
@@ -1371,20 +1371,36 @@ public final class NonstopMixMenu {
             }
             ImGui.endChild();
             if (ImGui.button(t("この案を適用（元に戻せます）", "Apply (can be undone)") + "##nm-apply")) {
+                boolean newSet = consumedGenerator != null && MixGenerator.makesNewSet(plan, consumedGenerator.scope());
+                if (newSet) {
+                    // the current set is kept as it is (saved even if it never was); the result becomes another set
+                    saveQuietly();
+                }
                 edit();
                 MixPlan next = generated;
-                next.id = plan.id;
-                next.name = plan.name.isEmpty() ? defaultName(next) : plan.name;
-                next.description = plan.description;
-                next.irId = plan.irId;
-                next.irRevision = plan.irRevision;
+                if (newSet) {
+                    next.id = java.util.UUID.randomUUID().toString();
+                    next.name = defaultName(next);
+                    next.description = "";
+                    next.irId = "";
+                    next.irRevision = 0;
+                } else {
+                    next.id = plan.id;
+                    next.name = plan.name.isEmpty() ? defaultName(next) : plan.name;
+                    next.description = plan.description;
+                    next.irId = plan.irId;
+                    next.irRevision = plan.irRevision;
+                }
                 plan = next;
                 syncTextFields();
                 generated = null;
                 selectedTrack = plan.tracks.isEmpty() ? -1 : 0;
                 selectedJoin = -1;
                 afterEdit();
-                ImGuiNotify.success(t("セットに適用しました", "Applied to the set"));
+                ImGuiNotify.success(newSet
+                        ? t("新しいセットとして適用しました（前のセットは保存済みセットに残ります）",
+                                "Applied as a new set (the previous one stays in Saved sets)")
+                        : t("セットに適用しました", "Applied to the set"));
             }
             ImGui.sameLine();
             if (ImGui.button(t("捨てる", "Discard") + "##nm-discard")) {
