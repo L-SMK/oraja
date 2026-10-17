@@ -6,6 +6,7 @@ import bms.player.beatoraja.MainController;
 import bms.player.beatoraja.arena.bmsir.BMSIRArenaI18n;
 import bms.player.beatoraja.arena.bmsir.BMSIRNonstopMixTransport;
 import bms.player.beatoraja.nonstop.CompiledMix;
+import bms.player.beatoraja.nonstop.MixChartSwap;
 import bms.player.beatoraja.nonstop.MixCompiler;
 import bms.player.beatoraja.nonstop.MixDifficulty;
 import bms.player.beatoraja.nonstop.MixGenerator;
@@ -176,7 +177,7 @@ public final class NonstopMixMenu {
         if (plan != null) {
             return;
         }
-        MixPlan draft = main != null ? store().loadDraft() : null;
+        MixPlan draft = main != null ? store().openingPlan() : null;
         plan = draft != null ? draft : new MixPlan();
         syncTextFields();
     }
@@ -251,6 +252,7 @@ public final class NonstopMixMenu {
         issues = List.of();
         issuesFor = "";
         checkWanted = true;
+        chartShiftNote = "";
         syncTextFields();
         afterEdit();
     }
@@ -754,6 +756,7 @@ public final class NonstopMixMenu {
         ImGui.sameLine();
         ImGuiRenderer.helpMarker(t("初回は曲ごとに音量解析をするため、開始まで時間がかかります。結果は保存され次回から速くなります。",
                 "The first time, each song is analysed before the set starts; results are cached."));
+        renderChartShift();
         ImGui.text(t("説明（IR公開時に表示）", "Description (shown on IR)"));
         if (ImGui.inputTextMultiline("##nm-description", DESCRIPTION, Math.max(200, ImGui.getContentRegionAvailX()), 70)) {
             if (!DESCRIPTION.get().equals(plan.description)) {
@@ -779,6 +782,7 @@ public final class NonstopMixMenu {
                             "This song is not in your library. Get it and update the song database."));
             return;
         }
+        renderChartSwap(index, track);
         if (analysis == null) {
             ImGui.text(ANALYSIS_FAILED.contains(track.sha256) ? t("譜面を読み込めませんでした", "Could not load the chart")
                     : t("譜面を解析しています…", "Analysing the chart..."));
@@ -869,6 +873,96 @@ public final class NonstopMixMenu {
     }
 
     private static final ImBoolean SNAP = new ImBoolean(true);
+
+    // ------------------------------------------------------------------ other charts (差分)
+
+    private static List<SongData> chartChoices = List.of();
+    private static String chartChoicesFor = "";
+    private static String chartShiftNote = "";
+
+    private static void renderChartSwap(int index, MixTrack track) {
+        if (ImGui.smallButton(t("別の差分に替える", "Use another chart of this song") + "##nm-swap-chart")) {
+            SongData current = library.find(track);
+            chartChoices = current == null ? List.of()
+                    : MixChartSwap.alternatives(current, MixChartSwap.charts(library).sameFolder(current), plan.mode.id);
+            chartChoicesFor = track.sha256;
+            ImGui.openPopup("##nm-swap-chart-popup");
+        }
+        if (!ImGui.beginPopup("##nm-swap-chart-popup")) {
+            return;
+        }
+        if (!chartChoicesFor.equals(track.sha256)) {
+            ImGui.closeCurrentPopup();
+        } else if (chartChoices.isEmpty()) {
+            ImGui.text(t("同じ曲フォルダにほかの差分がありません", "No other chart of this song in its folder"));
+        } else {
+            ImGui.textDisabled(t("使う区間・つなぎはそのまま。区間は新しい譜面の長さに収めます。",
+                    "The used part and the joins stay; the part is kept inside the new chart."));
+            for (int i = 0; i < chartChoices.size(); i++) {
+                SongData chart = chartChoices.get(i);
+                ImGui.pushID(3000 + i);
+                String text = String.format(Locale.ROOT, "%-8s Lv%-3d %5d notes  %s", MixChartSwap.difficultyName(chart.getDifficulty()),
+                        chart.getLevel(), chart.getNotes(), chart.getSubtitle() == null ? "" : chart.getSubtitle());
+                if (ImGui.selectable(text)) {
+                    edit();
+                    MixChartSwap.replaceChart(track, chart);
+                    requestAnalysis(track);
+                    afterEdit();
+                    chartChoicesFor = "";
+                    ImGui.closeCurrentPopup();
+                }
+                ImGui.popID();
+            }
+        }
+        ImGui.endPopup();
+    }
+
+    private static void renderChartShift() {
+        ImGui.beginDisabled(plan.tracks.isEmpty());
+        if (ImGui.button(t("全曲を一段易しい差分に", "All songs one chart easier") + "##nm-shift-easier")) {
+            shiftSet(-1);
+        }
+        ImGui.sameLine();
+        if (ImGui.button(t("一段難しい差分に", "One chart harder") + "##nm-shift-harder")) {
+            shiftSet(1);
+        }
+        ImGui.endDisabled();
+        ImGui.sameLine();
+        ImGuiRenderer.helpMarker(t("同じ曲フォルダの差分に替えた新しいセットを別名で保存して開きます。元のセットはそのまま残り、記録も別になります。",
+                "Saves and opens a new set that uses the neighbouring chart of each song. The original set and its records stay."));
+        if (!chartShiftNote.isEmpty()) {
+            ImGui.textWrapped(chartShiftNote);
+        }
+    }
+
+    private static void shiftSet(int direction) {
+        if (dirty) {
+            saveQuietly();
+        }
+        MixChartSwap.Shifted shifted = MixChartSwap.shiftSet(plan, direction, MixChartSwap.charts(library));
+        try {
+            store().saveSet(shifted.plan());
+        } catch (Exception e) {
+            ImGuiNotify.error(t("保存できませんでした: ", "Could not save: ") + e.getMessage());
+            return;
+        }
+        replacePlan(shifted.plan());
+        savedSets = null;
+        for (MixTrack track : plan.tracks) {
+            requestAnalysis(track);
+        }
+        if (shifted.unchanged().isEmpty()) {
+            chartShiftNote = "";
+        } else {
+            List<String> titles = new ArrayList<>();
+            for (MixTrack track : shifted.unchanged()) {
+                titles.add(track.displayTitle());
+            }
+            chartShiftNote = (direction < 0 ? t("易しい差分がないためそのままの曲: ", "Songs kept (no easier chart): ")
+                    : t("難しい差分がないためそのままの曲: ", "Songs kept (no harder chart): ")) + String.join(" / ", titles);
+        }
+        ImGuiNotify.success(t("新しいセットとして保存しました: ", "Saved as a new set: ") + plan.name);
+    }
 
     private static long stepBar(MixTrackAnalysis analysis, long ms, int direction) {
         if (analysis.bars.length == 0) {
@@ -1405,7 +1499,7 @@ public final class NonstopMixMenu {
             ImGui.beginChild("##nm-generated", 0, Math.max(120, ImGui.getContentRegionAvailY() - 40), true);
             for (int i = 0; i < generated.tracks.size(); i++) {
                 MixTrack track = generated.tracks.get(i);
-                double axis = generator != null ? generator.difficulty(track) : Double.NaN;
+                double axis = consumedGenerator != null ? consumedGenerator.difficulty(track) : Double.NaN;
                 ImGui.text(String.format(Locale.ROOT, "%2d. %s  [%s] BPM%.0f %s", i + 1, track.displayTitle(), track.genre,
                         track.bpm, Double.isNaN(axis) ? "Lv" + track.level : MixDifficulty.label(axis)));
                 if (i < generated.transitions.size()) {
@@ -1414,20 +1508,36 @@ public final class NonstopMixMenu {
             }
             ImGui.endChild();
             if (ImGui.button(t("この案を適用（元に戻せます）", "Apply (can be undone)") + "##nm-apply")) {
+                boolean newSet = consumedGenerator != null && MixGenerator.makesNewSet(plan, consumedGenerator.scope());
+                if (newSet) {
+                    // the current set is kept as it is (saved even if it never was); the result becomes another set
+                    saveQuietly();
+                }
                 edit();
                 MixPlan next = generated;
-                next.id = plan.id;
-                next.name = plan.name.isEmpty() ? defaultName(next) : plan.name;
-                next.description = plan.description;
-                next.irId = plan.irId;
-                next.irRevision = plan.irRevision;
+                if (newSet) {
+                    next.id = java.util.UUID.randomUUID().toString();
+                    next.name = defaultName(next);
+                    next.description = "";
+                    next.irId = "";
+                    next.irRevision = 0;
+                } else {
+                    next.id = plan.id;
+                    next.name = plan.name.isEmpty() ? defaultName(next) : plan.name;
+                    next.description = plan.description;
+                    next.irId = plan.irId;
+                    next.irRevision = plan.irRevision;
+                }
                 plan = next;
                 syncTextFields();
                 generated = null;
                 selectedTrack = plan.tracks.isEmpty() ? -1 : 0;
                 selectedJoin = -1;
                 afterEdit();
-                ImGuiNotify.success(t("セットに適用しました", "Applied to the set"));
+                ImGuiNotify.success(newSet
+                        ? t("新しいセットとして適用しました（前のセットは保存済みセットに残ります）",
+                                "Applied as a new set (the previous one stays in Saved sets)")
+                        : t("セットに適用しました", "Applied to the set"));
             }
             ImGui.sameLine();
             if (ImGui.button(t("捨てる", "Discard") + "##nm-discard")) {
