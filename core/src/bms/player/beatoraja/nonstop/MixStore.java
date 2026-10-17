@@ -12,7 +12,9 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 /**
@@ -133,12 +135,27 @@ public final class MixStore {
     public MixResult best(String identity) {
         MixResult best = null;
         for (MixResult result : records(identity)) {
-            if (best == null || result.clear > best.clear
-                    || result.clear == best.clear && result.exScore > best.exScore) {
+            if (better(result, best)) {
                 best = result;
             }
         }
         return best;
+    }
+
+    /** Best record of every set identity, read in one pass (for listing many sets). */
+    public Map<String, MixResult> bestByIdentity() {
+        Map<String, MixResult> best = new HashMap<>();
+        for (MixResult result : records(null)) {
+            if (better(result, best.get(result.identity))) {
+                best.put(result.identity, result);
+            }
+        }
+        return best;
+    }
+
+    private static boolean better(MixResult result, MixResult best) {
+        return best == null || result.clear > best.clear
+                || result.clear == best.clear && result.exScore > best.exScore;
     }
 
     private static String safeName(String id) {

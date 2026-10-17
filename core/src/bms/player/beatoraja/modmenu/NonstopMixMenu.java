@@ -156,7 +156,7 @@ public final class NonstopMixMenu {
 
     public static void setMain(MainController controller) {
         main = controller;
-        library = new MixLibrary(controller);
+        library = MixLibrary.shared(controller);
     }
 
     private static MixStore store() {
@@ -362,9 +362,7 @@ public final class NonstopMixMenu {
     }
 
     private static String clearName(int clear) {
-        String[] names = {"NO PLAY", "FAILED", "ASSIST EASY", "LIGHT ASSIST EASY", "EASY", "CLEAR", "HARD",
-                "EX HARD", "FULL COMBO", "PERFECT", "MAX"};
-        return clear >= 0 && clear < names.length ? names[clear] : String.valueOf(clear);
+        return MixResult.clearName(clear);
     }
 
     // ------------------------------------------------------------------ header
