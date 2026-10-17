@@ -52,12 +52,14 @@ public final class MixGenerator {
     private final List<String> notes = new java.util.concurrent.CopyOnWriteArrayList<>();
     private final java.util.Map<MixTrack, Double> difficulties =
             java.util.Collections.synchronizedMap(new java.util.IdentityHashMap<>());
+    private Scope scope = Scope.EVERYTHING;
 
     private MixGenerator() {
     }
 
     public static MixGenerator start(MixPlan base, Request request, MixLibrary library) {
         MixGenerator job = new MixGenerator();
+        job.scope = request.scope;
         MixPlan snapshot = base.copy();
         Thread worker = new Thread(() -> job.run(snapshot, request, library), "nonstop-mix-generate");
         worker.setDaemon(true);
@@ -79,6 +81,20 @@ public final class MixGenerator {
 
     public MixPlan result() {
         return result;
+    }
+
+    /** What this job was asked to choose; the request object itself is reused by the editor. */
+    public Scope scope() {
+        return scope;
+    }
+
+    /**
+     * Whether applying a result onto {@code current} makes a new set instead of
+     * rewriting it (#555). A whole new selection is a different set; keeping the
+     * current id would overwrite the saved one on the next save.
+     */
+    public static boolean makesNewSet(MixPlan current, Scope scope) {
+        return scope == Scope.EVERYTHING && !current.tracks.isEmpty();
     }
 
     /** Messages for the player about what could not be satisfied. */
