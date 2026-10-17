@@ -23,6 +23,16 @@ OpenALでは未対応と表示し、設定値を保持します。変更は本�
 
 ## Current Version
 
+Version 0.4.14.120 preserves 0.4.14.119 and brings in main-only changes
+(#569): HI-SPEED gets its own tab and F5 window with Normal/LR2/Floating per
+key mode and live switching, and Floating HI-SPEED is green-number driven
+(#506, #509); the Music Select Arena overlay is reorganized (#509); an option
+ends play right after the last note while the audio continues into the result
+(#511); twelve visual-only MANIAC OPTIONS are removed (#513); and Skin Select
+previews start at their first rendered frame and match the real screens (#328).
+Arena plugin 0.0.81 and launcher 0.2.30 are retained. See
+[the test scope](docs/TEST_RELEASE_0.4.14.120.md).
+
 Version 0.4.14.119 preserves 0.4.14.118 and updates NONSTOP MIX (#567): a
 Music Select NONSTOP MIX folder plays saved and IR sets with the controller
 only (#539); the generator ranks charts by difficulty tables and density on
