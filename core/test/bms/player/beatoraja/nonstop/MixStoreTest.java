@@ -42,6 +42,8 @@ class MixStoreTest {
                 java.nio.file.StandardOpenOption.APPEND);
         assertEquals(2, store.records(first.identity).size());
         assertEquals(5, store.best(first.identity).clear, "a better lamp wins over a higher score");
+        assertEquals(5, store.bestByIdentity().get(first.identity).clear, "the one-pass best agrees with best()");
+        assertFalse(store.bestByIdentity().containsKey("other"));
         assertTrue(store.records("other").isEmpty());
 
         store.saveDraft(plan);
