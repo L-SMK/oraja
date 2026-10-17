@@ -39,10 +39,13 @@ class NonstopMixBarsTest {
     void folderListsSavedSetsWithTheirBestLampThenTheIrFolder() throws Exception {
         MixStore store = new MixStore(directory.resolve("nonstopmix"));
         MixPlan older = plan("older", 2);
-        older.updatedAt = 1;
         MixPlan newer = plan("newer", 3);
-        newer.updatedAt = 2;
+        // saving stamps the current time, so the second save must land on a later millisecond
         store.saveSet(older);
+        long saved = older.updatedAt;
+        while (System.currentTimeMillis() <= saved) {
+            Thread.sleep(1);
+        }
         store.saveSet(newer);
         MixResult record = new MixResult();
         record.identity = MixJson.playIdentity(older);
