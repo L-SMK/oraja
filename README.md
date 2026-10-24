@@ -23,6 +23,13 @@ OpenALでは未対応と表示し、設定値を保持します。変更は本�
 
 ## Current Version
 
+Version 0.4.14.122 preserves 0.4.14.121 and adds the merged F5/F12 skin
+settings loading improvements (#580) and NANTOKA v2 BSS reversal fix (#579).
+A reversal no longer consumes a following scratch at the same input time.
+Plugin 0.0.81 and launcher 0.2.30 remain unchanged; updates remain optional.
+See [the test scope](docs/TEST_RELEASE_0.4.14.122.md). Physical skin-menu and
+controller acceptance remains operator-run.
+
 Version 0.4.14.121 preserves 0.4.14.120 and adds only #573's bounded Lua
 compilation reuse and reflection metadata reuse to reduce temporary allocation
 while loading skins. Mutable Lua state and callback results remain independent.
