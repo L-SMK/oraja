@@ -368,6 +368,7 @@ public final class PlayerResource {
 		if (model == null) {
 			return null;
 		}
+		if (!DETACHED_LOAD.get()) BMSIRParserCatalog.capture(model);
 		if (forceLongNotes) BMSIRLongNoteMode.apply(model);
 		if (decoder instanceof OSUDecoder) {
 			model.setFromOSU(true);
