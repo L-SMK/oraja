@@ -12,6 +12,8 @@ Refs #587, #351, #571。基準は0.4.14.123 (`6d27baa4`)。
 
 現在パーサーの決定的なBMS decodeだけを対象にする。旧revisionのリプレイ、選択されたRANDOM分岐、既に変換されたモデル、MANIAC PBの書込みからは永続カタログを更新しない。NONSTOP用などのdetached読込には捕捉処理を追加しない。RANDOMや未プレイ譜面は、引き続き通常の対象範囲再スキャンを使う。将来のmetadataを古い値へ戻さない。
 
+通常読込では呼出側の分岐指定がなくてもdecoderがRANDOMを抽選する。リソースのパスを設定する際も、その抽選結果を保持して捕捉対象から除外する。`ordinaryRandomLoadCannotReplaceTheCatalogWithOneSelectedBranch` は通常の読込・PB保存経路を通し、旧カタログのnotes・parser metadata・RANDOM属性が変わらないことを検証する。
+
 回帰テストは `ParserCatalogRefreshTest`。旧PBと新PBの共存、冷起動相当のカタログ再読込、可視SongDataとキャッシュ、元のタイトル・タグ・favoriteの保持、強制LNの元CN情報保持、CN選択時の標準カタログノーツ数、RANDOM・旧revisionの除外、両ハッシュ条件・将来metadataの保護、コース保存・更新対象外成績を検証する。コース保存では各stageのカタログだけを更新し、単曲PBは生成しない。
 
 本修正はPB保存後のカタログ・参照整合に限定する。本体IRインポートの保存先解決、プラグイン独自同期のparser-v3/強制LN対応、IR Webのノーツ数選択、IR既存成績の再分類は別経路の対応が必要。版上げ・JAR配布・本番データ変更は含めない。

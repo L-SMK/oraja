@@ -182,4 +182,22 @@ class ParserCatalogRefreshTest {
         BMSModel play = resource.loadBMSModel(path, 0);
         assertEquals(2, BMSIRParserCatalog.metadata(play).getNotes());
     }
+
+    @Test void ordinaryRandomLoadCannotReplaceTheCatalogWithOneSelectedBranch() throws Exception {
+        Path path = chart("#RANDOM 2\n#IF 1\n#00111:ZZ01\n#ENDIF\n"
+                + "#IF 2\n#00111:01\n#ENDIF\n#ENDRANDOM\n");
+        BMSDecoder previous = new BMSDecoder(); previous.setCompatibilityRevision(2);
+        SongData stale = new SongData(previous.decode(new ChartInformation(path, 0, new int[]{1})), false);
+        SQLiteSongDatabaseAccessor db = catalog(stale);
+        Config config = config(); PlayerConfig player = new PlayerConfig(); player.setBmsirForceLn(false);
+        PlayDataAccessor data = new PlayDataAccessor(config, player); data.setSongDatabase(db);
+        BMSModel played = new PlayerResource(config, player, null, null).loadBMSModel(path, 0);
+
+        assertNull(BMSIRParserCatalog.metadata(played), "A generated RANDOM branch is not canonical catalog metadata");
+        assertNotNull(played.getRandom()); assertEquals(1, played.getRandom().length);
+        data.writeScoreData(score(played), played, 0, true);
+        SongData retained = db.getSongDatas("sha256", played.getSHA256())[0];
+        assertEquals(stale.getParsercompatibility(), retained.getParsercompatibility());
+        assertEquals(stale.getNotes(), retained.getNotes()); assertTrue(retained.hasRandomSequence());
+    }
 }
