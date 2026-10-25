@@ -79,7 +79,7 @@ class BMSIRArenaClientTest {
                 BMSIRArenaClient.clientVersion()
         );
         assertEquals(8, BMSIRArenaClient.protocolVersion());
-        assertEquals("Arena oraja 0.4.14.122", Version.getArenaDisplayName());
+        assertEquals("Arena oraja 0.4.14.123", Version.getArenaDisplayName());
     }
 
     @Test
